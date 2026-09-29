@@ -13,8 +13,14 @@ import {
 } from "react-native";
 import { TERMINAL_NAME } from "../shared/contracts";
 import { trimBlankEdges, withoutRunMarkers } from "../shared/text";
+import { XtermView } from "./xterm-view";
 
 type Theme = PluginWorkspacePanelProps["theme"];
+type Styles = ReturnType<typeof createStyles>;
+// Derived from the SDK so the bundler's import checks never walk @getpaseo/client typings.
+type PaseoTerminal = Awaited<
+  ReturnType<ReturnType<typeof usePaseo>["terminals"]["list"]>
+>["entries"][number];
 
 const SCREEN_LINES = 400;
 const SCREEN_POLL_MS = 600;
@@ -33,15 +39,11 @@ const KEYS = [
   { label: "Tab", data: "\t" },
 ] as const;
 
-/** A plain-text mirror of the "Agent commands" terminal with a line of input. */
+/** The "Agent commands" terminal: live xterm.js on web, a plain-text mirror elsewhere. */
 export function TerminalPanel({ theme, layout, workspaceId }: PluginWorkspacePanelProps) {
   const paseo = usePaseo();
-  const toast = useToast();
   const styles = useMemo(() => createStyles(theme, layout.compact), [theme, layout.compact]);
-  const [draft, setDraft] = useState("");
-  const [hidden, setHidden] = useState(false);
-  const scroller = useRef<NativeScrollView>(null);
-  const pinned = useRef(true);
+  const [liveError, setLiveError] = useState<{ terminalId: string; reason: string } | null>(null);
 
   const lookup = useQuery({
     queryKey: ["agent-terminal", workspaceId],
@@ -53,11 +55,60 @@ export function TerminalPanel({ theme, layout, workspaceId }: PluginWorkspacePan
   });
   const terminal = lookup.data ?? null;
 
+  if (!terminal) {
+    const message = lookup.isLoading
+      ? "Looking for the terminal…"
+      : `No "${TERMINAL_NAME}" terminal yet. It opens with the first run.`;
+    return (
+      <View style={styles.screen}>
+        <Text style={styles.muted}>{message}</Text>
+      </View>
+    );
+  }
+
+  const fallback = liveError?.terminalId === terminal.id ? liveError.reason : null;
+  if (Platform.OS === "web" && !fallback) {
+    return (
+      <XtermView
+        key={terminal.id}
+        terminalId={terminal.id}
+        theme={theme}
+        onUnavailable={(reason) => setLiveError({ terminalId: terminal.id, reason })}
+      />
+    );
+  }
+  return (
+    <TextMirror
+      terminal={terminal}
+      theme={theme}
+      styles={styles}
+      note={fallback ? `Live terminal unavailable: ${fallback}` : null}
+    />
+  );
+}
+
+/** A plain-text copy of the terminal with a line of input, for platforms without a DOM. */
+function TextMirror({
+  terminal,
+  theme,
+  styles,
+  note,
+}: {
+  terminal: PaseoTerminal;
+  theme: Theme;
+  styles: Styles;
+  note: string | null;
+}) {
+  const paseo = usePaseo();
+  const toast = useToast();
+  const [draft, setDraft] = useState("");
+  const [hidden, setHidden] = useState(false);
+  const scroller = useRef<NativeScrollView>(null);
+  const pinned = useRef(true);
+
   const screen = useQuery({
-    queryKey: ["agent-terminal-screen", terminal?.id],
-    enabled: terminal !== null,
+    queryKey: ["agent-terminal-screen", terminal.id],
     queryFn: async () => {
-      if (!terminal) return "";
       const { lines } = await paseo.terminals
         .ref(terminal)
         .capture({ start: -SCREEN_LINES, stripAnsi: true });
@@ -67,7 +118,6 @@ export function TerminalPanel({ theme, layout, workspaceId }: PluginWorkspacePan
   });
 
   function write(data: string) {
-    if (!terminal) return;
     try {
       paseo.terminals.ref(terminal).write(data);
       pinned.current = true;
@@ -86,12 +136,9 @@ export function TerminalPanel({ theme, layout, workspaceId }: PluginWorkspacePan
     pinned.current = contentOffset.y + layoutMeasurement.height >= contentSize.height - PIN_SLACK;
   }
 
-  let placeholder: string | null = null;
-  if (lookup.isLoading) placeholder = "Looking for the terminal…";
-  else if (!terminal) placeholder = `No "${TERMINAL_NAME}" terminal yet. It opens with the first run.`;
-
   return (
     <View style={styles.screen}>
+      {note ? <Text style={styles.muted}>{note}</Text> : null}
       <ScrollView
         ref={scroller}
         style={styles.output}
@@ -102,13 +149,9 @@ export function TerminalPanel({ theme, layout, workspaceId }: PluginWorkspacePan
           if (pinned.current) scroller.current?.scrollToEnd({ animated: false });
         }}
       >
-        {placeholder ? (
-          <Text style={styles.muted}>{placeholder}</Text>
-        ) : (
-          <Text style={styles.text} selectable>
-            {screen.data ?? ""}
-          </Text>
-        )}
+        <Text style={styles.text} selectable>
+          {screen.data ?? ""}
+        </Text>
       </ScrollView>
 
       <View style={styles.inputRow}>
@@ -118,7 +161,6 @@ export function TerminalPanel({ theme, layout, workspaceId }: PluginWorkspacePan
           onChangeText={setDraft}
           onSubmitEditing={submit}
           submitBehavior="submit"
-          editable={terminal !== null}
           secureTextEntry={hidden}
           autoCapitalize="none"
           autoCorrect={false}
@@ -132,7 +174,6 @@ export function TerminalPanel({ theme, layout, workspaceId }: PluginWorkspacePan
           theme={theme}
           icon="SendHorizontal"
           label="Send"
-          disabled={terminal === null}
           onPress={submit}
         />
       </View>
@@ -143,8 +184,7 @@ export function TerminalPanel({ theme, layout, workspaceId }: PluginWorkspacePan
             styles={styles}
             theme={theme}
             label={key.label}
-            disabled={terminal === null}
-            onPress={() => write(key.data)}
+              onPress={() => write(key.data)}
           />
         ))}
         <KeyButton
@@ -167,7 +207,7 @@ function KeyButton({
   disabled = false,
   onPress,
 }: {
-  styles: ReturnType<typeof createStyles>;
+  styles: Styles;
   theme: Theme;
   icon?: string;
   label: string;

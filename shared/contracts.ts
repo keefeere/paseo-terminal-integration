@@ -69,6 +69,33 @@ export const runAdhoc = defineRpc({
   output: z.object({ cardId: z.string(), openTerminal: z.enum(openTerminalOptions) }),
 });
 
+const terminalSize = { rows: z.number().int().min(2).max(500), cols: z.number().int().min(10).max(1000) };
+
+export const openTerminalView = defineRpc({
+  name: "view.open",
+  input: z.object({ terminalId: z.string(), ...terminalSize }),
+  output: z.object({ viewId: z.string() }),
+});
+
+/** Long-polls for terminal output after `cursor`, which acknowledges everything before it. */
+export const readTerminalView = defineRpc({
+  name: "view.read",
+  input: z.object({ viewId: z.string(), cursor: z.number().int().nonnegative() }),
+  output: z.object({ data: z.string(), cursor: z.number().int(), closed: z.string().nullable() }),
+});
+
+export const resizeTerminalView = defineRpc({
+  name: "view.resize",
+  input: z.object({ viewId: z.string(), ...terminalSize }),
+  output: z.object({}),
+});
+
+export const closeTerminalView = defineRpc({
+  name: "view.close",
+  input: z.object({ viewId: z.string() }),
+  output: z.object({}),
+});
+
 export const scanBlocks = defineRpc({
   name: "blocks.scan",
   input: z.object({ agentId: z.string() }),

@@ -13,9 +13,11 @@ card under the reply:
 - **Stop** sends Ctrl-C; **Send output so far** reports a still-running command.
 
 **Terminal panel.** The card's **Terminal** button shows "Agent commands" in the side panel
-(Explorer): a live plain-text copy of the terminal with an input line and Enter, Ctrl-C, Ctrl-D, and
-Tab keys, so prompts such as `sudo` passwords, `y/n` questions, or npm's "Press ENTER" can be
-answered without leaving the chat. **Hide input** masks what you type. By default the panel opens
+(Explorer) as a full terminal: the same xterm.js renderer and live stream as Paseo's terminal tabs,
+with colors, the cursor, full-screen programs, and keyboard input. Click it and type to answer
+`sudo` passwords, `y/n` questions, or npm's "Press ENTER" without leaving the chat. Copy and paste
+with Ctrl-Shift-C and Ctrl-Shift-V; Ctrl-C goes to the shell. On phones the panel is a plain-text
+copy with an input line and Enter, Ctrl-C, Ctrl-D, and Tab keys. By default the panel opens
 whenever a run starts; change that under **Settings → Plugins → Terminal integration** (side panel,
 workspace tab, or don't open). Phones never switch tabs automatically.
 
@@ -34,9 +36,9 @@ Requires Paseo 0.10.1 or later and a macOS or Linux daemon host with `bash` (plu
 
 ```bash
 paseo plugin install npm:paseo-terminal-integration
-# or from GitHub
-paseo plugin install github:keefeere/paseo-terminal-integration
 ```
+
+Install from npm: GitHub installs skip npm dependencies, which the terminal panel needs.
 
 Plugins are trusted, unsandboxed code: this one types commands into terminals on the daemon host.
 Nothing runs until you press a button or submit `/run`.
@@ -55,6 +57,10 @@ Nothing runs until you press a button or submit `/run`.
 - Output is read from the terminal screen, so very long lines arrive wrapped and only the last
   3,000 rows are visible. The agent receives at most 300 lines or 24,000 characters.
 - Run state lives in the plugin process; reloading the plugin forgets it (the cards stay).
+- The live panel opens its own connection to the daemon on the plugin host, using the address in
+  `$PASEO_HOME/paseo.pid` and the local credential, as the `paseo` CLI does. A daemon listening on
+  a Unix socket gets the plain-text panel instead.
+- Opening or resizing the panel resizes the PTY to fit it, as focusing a terminal tab does.
 - A command that has not started within 20 seconds fails, for example when something else is
   running in "Agent commands".
 

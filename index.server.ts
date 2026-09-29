@@ -2,9 +2,14 @@ import type { PluginServerContext } from "@getpaseo/plugin/server";
 import { searchTerminals } from "./server/attachments";
 import { appendCardForTurn, appendRunCard, scanLatestReply } from "./server/cards";
 import { cleanupScripts, TerminalRunner } from "./server/runner";
+import { TerminalStreams } from "./server/streams";
 import { preferences } from "./shared/settings";
 import {
   cancelRun,
+  closeTerminalView,
+  openTerminalView,
+  readTerminalView,
+  resizeTerminalView,
   runAdhoc,
   runKey,
   runStatus,
@@ -17,6 +22,7 @@ import {
 export default function contribute(server: PluginServerContext) {
   const settings = server.registerSettings(preferences);
   let runner: TerminalRunner | null = null;
+  const streams = new TerminalStreams();
   const runnerFor = (paseo: ConstructorParameters<typeof TerminalRunner>[0]) =>
     (runner ??= new TerminalRunner(paseo));
 
@@ -42,8 +48,14 @@ export default function contribute(server: PluginServerContext) {
 
   server.handle(searchTerminalOutput, searchTerminals);
 
+  server.handle(openTerminalView, (input) => streams.open(input));
+  server.handle(readTerminalView, (input) => streams.read(input));
+  server.handle(resizeTerminalView, (input) => streams.resize(input));
+  server.handle(closeTerminalView, (input) => streams.close(input));
+
   return async () => {
     runner?.stop();
+    await streams.stop();
     await cleanupScripts();
   };
 }

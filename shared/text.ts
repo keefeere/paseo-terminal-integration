@@ -5,11 +5,14 @@ export function fenced(content: string, lang = ""): string {
   return `${fence}${lang}\n${content}\n${fence}`;
 }
 
-/** Removes the run markers the runner prints around command output. */
+/** Matches the run markers the runner prints, concealed, around command output. */
+export const RUN_MARKER = /__PTI_(?:BEGIN_[0-9a-f]+|END_[0-9a-f]+_\d+)__/g;
+
+/** Removes the run markers from captured lines. */
 export function withoutRunMarkers(lines: readonly string[]): string[] {
   return lines
     .filter((line) => !/^\s*__PTI_BEGIN_[0-9a-f]+__\s*$/.test(line))
-    .map((line) => line.replace(/__PTI_(?:BEGIN_[0-9a-f]+|END_[0-9a-f]+_\d+)__/g, ""));
+    .map((line) => line.replace(RUN_MARKER, ""));
 }
 
 export function trimBlankEdges(lines: readonly string[]): string[] {
