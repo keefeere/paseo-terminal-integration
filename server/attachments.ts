@@ -2,7 +2,7 @@ import { pathToFileURL } from "node:url";
 import type { RpcInput, RpcOutput } from "@getpaseo/plugin";
 import type { PluginHandlerContext } from "@getpaseo/plugin/server";
 import type { searchTerminalOutput } from "../shared/contracts";
-import { fenced, trimBlankEdges, withoutRunMarkers } from "./text";
+import { fenced, trimBlankEdges, withoutRunMarkers } from "../shared/text";
 
 const DEFAULT_LINES = 200;
 const MAX_LINES = 2_000;

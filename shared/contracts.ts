@@ -1,5 +1,6 @@
 import { defineAttachmentSource, defineRpc } from "@getpaseo/plugin";
 import { z } from "zod";
+import { openTerminalOptions } from "./settings";
 
 export const TERMINAL_NAME = "Agent commands";
 
@@ -65,7 +66,7 @@ export const sendRunOutput = defineRpc({
 export const runAdhoc = defineRpc({
   name: "run.adhoc",
   input: z.object({ agentId: z.string(), command: z.string().min(1) }),
-  output: z.object({ cardId: z.string() }),
+  output: z.object({ cardId: z.string(), openTerminal: z.enum(openTerminalOptions) }),
 });
 
 export const scanBlocks = defineRpc({

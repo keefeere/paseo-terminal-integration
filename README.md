@@ -12,7 +12,14 @@ card under the reply:
 - **Run only** runs it without sending; **Send output** sends it later.
 - **Stop** sends Ctrl-C; **Send output so far** reports a still-running command.
 
-The terminal is a real PTY, so prompts (`sudo`, `y/n`) can be answered in the terminal tab. Runs in
+**Terminal panel.** The card's **Terminal** button shows "Agent commands" in the side panel
+(Explorer): a live plain-text copy of the terminal with an input line and Enter, Ctrl-C, Ctrl-D, and
+Tab keys, so prompts such as `sudo` passwords, `y/n` questions, or npm's "Press ENTER" can be
+answered without leaving the chat. **Hide input** masks what you type. By default the panel opens
+whenever a run starts; change that under **Settings → Plugins → Terminal integration** (side panel,
+workspace tab, or don't open). Phones never switch tabs automatically.
+
+The terminal is a real PTY, so the native terminal tab works for prompts too. Runs in
 one workspace are queued so a command never types into another one's stdin. Each block runs as a
 script in the agent's working directory, so `cd` and `export` do not persist between runs.
 
@@ -41,6 +48,7 @@ Nothing runs until you press a button or submit `/run`.
 | `/run <command>`                                | Run a shell command and send its output to the agent        |
 | `/blocks`                                       | Add a run card for the latest reply (e.g. older chats)      |
 | ⌘K / Ctrl+K → "Terminal: add run buttons to …"  | Same as `/blocks`                                           |
+| ⌘K / Ctrl+K → "Terminal: show … in the side panel" | Open the terminal panel in the Explorer                  |
 
 ## Limitations
 

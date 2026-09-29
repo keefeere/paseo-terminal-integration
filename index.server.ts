@@ -2,6 +2,7 @@ import type { PluginServerContext } from "@getpaseo/plugin/server";
 import { searchTerminals } from "./server/attachments";
 import { appendCardForTurn, appendRunCard, scanLatestReply } from "./server/cards";
 import { cleanupScripts, TerminalRunner } from "./server/runner";
+import { preferences } from "./shared/settings";
 import {
   cancelRun,
   runAdhoc,
@@ -14,6 +15,7 @@ import {
 } from "./shared/contracts";
 
 export default function contribute(server: PluginServerContext) {
+  const settings = server.registerSettings(preferences);
   let runner: TerminalRunner | null = null;
   const runnerFor = (paseo: ConstructorParameters<typeof TerminalRunner>[0]) =>
     (runner ??= new TerminalRunner(paseo));
@@ -30,7 +32,8 @@ export default function contribute(server: PluginServerContext) {
     const cardId = await appendRunCard(paseo, agentId, [block]);
     if (!cardId) throw new Error("Command is too long");
     await runnerFor(paseo).start({ agentId, key: runKey(cardId, 0), ...block, send: true });
-    return { cardId };
+    const saved = await settings.read();
+    return { cardId, openTerminal: saved.status === "ready" ? saved.values.openTerminal : "off" };
   });
 
   server.handle(scanBlocks, async ({ agentId }, { paseo }) => ({

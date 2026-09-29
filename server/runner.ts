@@ -5,7 +5,7 @@ import path from "node:path";
 import type { PluginHandlerContext } from "@getpaseo/plugin/server";
 import { interpreterFor, type Interpreter } from "../shared/code-blocks";
 import { TERMINAL_NAME, type RunSnapshot } from "../shared/contracts";
-import { fenced, trimBlankEdges } from "./text";
+import { fenced, trimBlankEdges } from "../shared/text";
 
 type Paseo = PluginHandlerContext["paseo"];
 type TerminalHandle = ReturnType<Paseo["terminals"]["ref"]>;

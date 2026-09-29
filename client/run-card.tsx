@@ -1,4 +1,4 @@
-import { useRpc, type PluginTimelineItemProps } from "@getpaseo/plugin/client";
+import { useAgent, useRpc, useSettings, type PluginTimelineItemProps } from "@getpaseo/plugin/client";
 import { copyText, Icon, useToast } from "@getpaseo/plugin/client/react-native";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useMemo, useState } from "react";
@@ -13,6 +13,8 @@ import {
   type RunCardData,
   type RunSnapshot,
 } from "../shared/contracts";
+import { preferences } from "../shared/settings";
+import { openTerminalPanel } from "./panel-opener";
 
 type Theme = PluginTimelineItemProps["theme"];
 type Styles = ReturnType<typeof createStyles>;
@@ -41,6 +43,22 @@ export function RunCard({ item, agentId, theme, layout }: PluginTimelineItemProp
   const start = useRpc(startRun);
   const cancel = useRpc(cancelRun);
   const send = useRpc(sendRunOutput);
+
+  const workspaceId = useAgent(agentId, (agent) => agent.workspaceId);
+  const settings = useSettings(preferences);
+  function showTerminal(explicit: boolean) {
+    if (!workspaceId) return;
+    // Until the saved choice loads, only an explicit press opens the panel.
+    const saved = settings.status === "ready" ? settings.values.openTerminal : "off";
+    const where = explicit && saved === "off" ? "explorer" : saved;
+    openTerminalPanel(workspaceId, where, { compact: layout.compact, explicit });
+  }
+  function runBlock(key: string, block: RunCardData["blocks"][number], sendOutput: boolean) {
+    return act(key, async () => {
+      await start({ agentId, key, lang: block.lang, code: block.code, send: sendOutput });
+      showTerminal(false);
+    });
+  }
 
   const queryKey = useMemo(() => ["terminal-run-status", cardId], [cardId]);
   const status = useQuery({
@@ -73,6 +91,16 @@ export function RunCard({ item, agentId, theme, layout }: PluginTimelineItemProp
         <Text style={styles.muted} numberOfLines={1}>
           · {TERMINAL_NAME}
         </Text>
+        <View style={styles.spacer} />
+        {workspaceId ? (
+          <ActionButton
+            styles={styles}
+            theme={theme}
+            icon="PanelRight"
+            label="Terminal"
+            onPress={() => showTerminal(true)}
+          />
+        ) : null}
       </View>
       {blocks.map((block, index) => {
         const key = keys[index];
@@ -119,9 +147,7 @@ export function RunCard({ item, agentId, theme, layout }: PluginTimelineItemProp
                     label={run ? "Run again & send" : "Run & send to agent"}
                     tone="primary"
                     disabled={busy || active}
-                    onPress={() =>
-                      act(key, () => start({ agentId, key, lang: block.lang, code: block.code, send: true }))
-                    }
+                    onPress={() => runBlock(key, block, true)}
                   />
                   <ActionButton
                     styles={styles}
@@ -129,9 +155,7 @@ export function RunCard({ item, agentId, theme, layout }: PluginTimelineItemProp
                     icon="SquareTerminal"
                     label="Run only"
                     disabled={busy || active}
-                    onPress={() =>
-                      act(key, () => start({ agentId, key, lang: block.lang, code: block.code, send: false }))
-                    }
+                    onPress={() => runBlock(key, block, false)}
                   />
                   {run && !run.sent && !active ? (
                     <ActionButton
@@ -263,6 +287,7 @@ function createStyles(theme: Theme, compact: boolean) {
     header: { flexDirection: "row" as const, alignItems: "center" as const, gap: 6 },
     title: { color: theme.colors.foreground, fontWeight: "600" as const },
     muted: { color: theme.colors.foregroundMuted, flexShrink: 1 },
+    spacer: { flex: 1 },
     success: { color: theme.colors.statusSuccess },
     danger: { color: theme.colors.statusDanger },
     block: { gap: 8 },
