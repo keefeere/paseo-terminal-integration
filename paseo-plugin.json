@@ -1,0 +1,7 @@
+{
+  "id": "terminal-integration",
+  "description": "Run agent code blocks in a Paseo terminal and send terminal output back to the agent",
+  "requirements": {
+    "paseo": ">=0.10.1"
+  }
+}

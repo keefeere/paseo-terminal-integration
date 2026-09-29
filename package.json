@@ -1,0 +1,42 @@
+{
+  "name": "paseo-terminal-integration",
+  "version": "0.1.0",
+  "files": [
+    "paseo-plugin.json",
+    "index.client.tsx",
+    "index.server.ts",
+    "client/",
+    "server/",
+    "shared/"
+  ],
+  "scripts": {
+    "typecheck": "tsc --noEmit"
+  },
+  "devDependencies": {
+    "@getpaseo/plugin": "0.10.1",
+    "@tanstack/react-query": "^5.90.11",
+    "@types/node": "^26.6.2",
+    "@types/react": "~19.2.0",
+    "react": "19.1.0",
+    "react-native": "0.81.5",
+    "typescript": "^5.9.3",
+    "zod": "^4.4.3"
+  },
+  "description": "Run agent code blocks in a Paseo terminal and send the output back to the agent; attach terminal output to prompts",
+  "license": "MIT",
+  "author": "Chechulin Serhii",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/keefeere/paseo-terminal-integration.git"
+  },
+  "homepage": "https://github.com/keefeere/paseo-terminal-integration#readme",
+  "bugs": {
+    "url": "https://github.com/keefeere/paseo-terminal-integration/issues"
+  },
+  "keywords": [
+    "paseo",
+    "paseo-plugin",
+    "terminal",
+    "agents"
+  ]
+}
