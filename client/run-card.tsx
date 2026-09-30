@@ -1,4 +1,4 @@
-import { useAgent, useRpc, useSettings, type PluginTimelineItemProps } from "@getpaseo/plugin/client";
+import { useRpc, useSettings, type PluginTimelineItemProps } from "@getpaseo/plugin/client";
 import { copyText, Icon, useToast } from "@getpaseo/plugin/client/react-native";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useMemo, useState } from "react";
@@ -14,7 +14,6 @@ import {
   type RunSnapshot,
 } from "../shared/contracts";
 import { preferences } from "../shared/settings";
-import { openTerminalPanel } from "./panel-opener";
 
 type Theme = PluginTimelineItemProps["theme"];
 type Styles = ReturnType<typeof createStyles>;
@@ -44,25 +43,10 @@ export function RunCard({ item, agentId, theme, layout }: PluginTimelineItemProp
   const cancel = useRpc(cancelRun);
   const send = useRpc(sendRunOutput);
 
-  const workspaceId = useAgent(agentId, (agent) => agent.workspaceId);
   const settings = useSettings(preferences);
-  const saved = settings.status === "ready" ? settings.values : null;
-  const panelLocation = saved?.panelLocation ?? "explorer";
   const [sendChoice, setSendChoice] = useState<boolean | null>(null);
-  const sendToAgent = sendChoice ?? saved?.sendToAgent ?? true;
-  const runVisibleLabel =
-    layout.compact || panelLocation === "workspace" ? "Run in terminal tab" : "Run in side terminal";
-
-  function showTerminal() {
-    if (!workspaceId) return;
-    openTerminalPanel(workspaceId, panelLocation, { compact: layout.compact, explicit: true });
-  }
-  function runBlock(key: string, block: RunCardData["blocks"][number], visible: boolean) {
-    return act(key, async () => {
-      await start({ agentId, key, lang: block.lang, code: block.code, send: sendToAgent });
-      if (visible) showTerminal();
-    });
-  }
+  const sendToAgent =
+    sendChoice ?? (settings.status === "ready" ? settings.values.sendToAgent : true);
 
   const queryKey = useMemo(() => ["terminal-run-status", cardId], [cardId]);
   const status = useQuery({
@@ -103,15 +87,6 @@ export function RunCard({ item, agentId, theme, layout }: PluginTimelineItemProp
           checked={sendToAgent}
           onChange={setSendChoice}
         />
-        {workspaceId ? (
-          <ActionButton
-            styles={styles}
-            theme={theme}
-            icon="PanelRight"
-            label="Terminal"
-            onPress={showTerminal}
-          />
-        ) : null}
       </View>
       {blocks.map((block, index) => {
         const key = keys[index];
@@ -154,19 +129,15 @@ export function RunCard({ item, agentId, theme, layout }: PluginTimelineItemProp
                   <ActionButton
                     styles={styles}
                     theme={theme}
-                    icon="PanelRight"
-                    label={runVisibleLabel}
+                    icon="Play"
+                    label={run ? "Run again" : "Run"}
                     tone="primary"
                     disabled={busy || active}
-                    onPress={() => runBlock(key, block, true)}
-                  />
-                  <ActionButton
-                    styles={styles}
-                    theme={theme}
-                    icon="Play"
-                    label="Run silently"
-                    disabled={busy || active}
-                    onPress={() => runBlock(key, block, false)}
+                    onPress={() =>
+                      act(key, () =>
+                        start({ agentId, key, lang: block.lang, code: block.code, send: sendToAgent }),
+                      )
+                    }
                   />
                   {run && !run.sent && !active ? (
                     <ActionButton

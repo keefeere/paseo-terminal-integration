@@ -1,36 +1,23 @@
+import type { PluginCleanup } from "@getpaseo/plugin";
 import type { PluginClientContext } from "@getpaseo/plugin/client";
-import { setPanelOpener } from "./client/panel-opener";
 import { RunCard } from "./client/run-card";
 import { SettingsScreen } from "./client/settings-screen";
-import { TerminalPanel } from "./client/terminal-panel";
 import {
   RUN_CARD_KIND,
   RUN_CARD_VERSION,
   runAdhoc,
   runCardSchema,
   scanBlocks,
-  TERMINAL_NAME,
   terminalOutputSource,
 } from "./shared/contracts";
-import { TERMINAL_PANEL_ID } from "./shared/settings";
 
-export default function contribute(client: PluginClientContext) {
-  setPanelOpener((id, options) => client.openPanel(id, options));
-
+// A function declaration: the host reads the default export before the module body has run.
+export default function contribute(client: PluginClientContext): PluginCleanup {
   client.addTimelineRenderer({
     kind: RUN_CARD_KIND,
     version: RUN_CARD_VERSION,
     schema: runCardSchema,
     Component: RunCard,
-  });
-
-  client.addWorkspacePanel({
-    id: TERMINAL_PANEL_ID,
-    title: TERMINAL_NAME,
-    icon: "SquareTerminal",
-    context: "workspace",
-    locations: ["explorer", "workspace"],
-    Component: TerminalPanel,
   });
 
   client.addSettingsScreen({
@@ -47,14 +34,9 @@ export default function contribute(client: PluginClientContext) {
     description: "Run a shell command in the workspace terminal and send its output to the agent",
     argumentHint: "<command>",
     context: "agent",
-    async onSubmit({ args, agent, rpc, openPanel }) {
+    async onSubmit({ args, agent, rpc }) {
       if (!args) throw new Error("Usage: /run <command>");
-      const { panelLocation } = await rpc(runAdhoc, { agentId: agent.id, command: args });
-      try {
-        openPanel(TERMINAL_PANEL_ID, { location: panelLocation });
-      } catch {
-        // Compact layouts have no Explorer; the card's Terminal button still opens a tab.
-      }
+      await rpc(runAdhoc, { agentId: agent.id, command: args });
     },
   });
 
@@ -80,20 +62,5 @@ export default function contribute(client: PluginClientContext) {
     onSelect: ({ agent, rpc }) => addRunButtons(agent.id, rpc),
   });
 
-  client.addCommandCenterItem({
-    id: "open-terminal-panel",
-    title: `Terminal: show "${TERMINAL_NAME}" in the side panel`,
-    icon: "PanelRight",
-    keywords: ["terminal", "explorer", "sidebar", "agent commands"],
-    context: "workspace",
-    onSelect({ openPanel }) {
-      try {
-        openPanel(TERMINAL_PANEL_ID, { location: "explorer" });
-      } catch {
-        openPanel(TERMINAL_PANEL_ID, { location: "workspace" });
-      }
-    },
-  });
-
-  return () => setPanelOpener(null);
+  return () => {};
 }
