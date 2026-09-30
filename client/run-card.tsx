@@ -83,7 +83,7 @@ export function RunCard({ item, agentId, theme, layout }: PluginTimelineItemProp
         <Checkbox
           styles={styles}
           theme={theme}
-          label="Send to agent"
+          label="Send output to agent"
           checked={sendToAgent}
           onChange={setSendChoice}
         />

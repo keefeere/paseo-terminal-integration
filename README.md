@@ -7,9 +7,9 @@ Two-way bridge between agent chats and Paseo terminals.
 card under the reply:
 
 - **Run** runs the block in the workspace terminal "Agent commands", a regular Paseo terminal tab.
-- With **Send to agent** checked (the default), the command, exit code, and output go to the agent
-  as a new message when the block finishes. If the agent is busy, delivery waits until its turn
-  ends instead of interrupting it. Unchecked, **Send output** sends it later.
+- With **Send output to agent** checked (the default), the command, exit code, and output go to
+  the agent as a new message when the block finishes. If the agent is busy, delivery waits until
+  its turn ends instead of interrupting it. Unchecked, **Send output** sends it later.
 - **Stop** sends Ctrl-C; **Send output so far** reports a still-running command.
 
 **Terminal beside the chat.** "Agent commands" opens as a background tab. Drag the tab onto the

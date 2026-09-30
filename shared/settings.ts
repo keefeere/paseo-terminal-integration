@@ -6,7 +6,7 @@ export const preferences = defineSettings({
   scope: "host",
   version: 1,
   schema: z.object({
-    /** Initial state of a run card's "Send to agent" checkbox. */
+    /** Initial state of a run card's "Send output to agent" checkbox. */
     sendToAgent: z.boolean().default(true),
   }),
 });

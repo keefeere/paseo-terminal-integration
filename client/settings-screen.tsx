@@ -24,7 +24,7 @@ export function SettingsScreen({ theme }: PluginSurfaceProps) {
       <SettingsCard>
         <SettingsSwitch
           label="Send output to the agent by default"
-          hint={`Initial state of the "Send to agent" checkbox on each run card.`}
+          hint={`Initial state of the "Send output to agent" checkbox on each run card.`}
           value={values.sendToAgent}
           disabled={settings.saving}
           error={settings.saveError}
