@@ -77,6 +77,14 @@ paseo plugin reload terminal-integration
 paseo plugin logs terminal-integration
 ```
 
+To release, bump the version and push the tag; GitHub Actions publishes it to npm through trusted
+publishing, and Paseo Cafe picks up the new version from there:
+
+```bash
+npm version patch   # or minor; commits and tags vX.Y.Z
+git push --follow-tags
+```
+
 ## License
 
 MIT
