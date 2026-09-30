@@ -49,10 +49,9 @@ export default function contribute(client: PluginClientContext) {
     context: "agent",
     async onSubmit({ args, agent, rpc, openPanel }) {
       if (!args) throw new Error("Usage: /run <command>");
-      const { openTerminal } = await rpc(runAdhoc, { agentId: agent.id, command: args });
-      if (openTerminal === "off") return;
+      const { panelLocation } = await rpc(runAdhoc, { agentId: agent.id, command: args });
       try {
-        openPanel(TERMINAL_PANEL_ID, { location: openTerminal });
+        openPanel(TERMINAL_PANEL_ID, { location: panelLocation });
       } catch {
         // Compact layouts have no Explorer; the card's Terminal button still opens a tab.
       }

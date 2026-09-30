@@ -3,15 +3,17 @@ import { z } from "zod";
 
 export const TERMINAL_PANEL_ID = "terminal";
 
-export const openTerminalOptions = ["explorer", "workspace", "off"] as const;
-export type OpenTerminalOption = (typeof openTerminalOptions)[number];
+export const panelLocations = ["explorer", "workspace"] as const;
+export type PanelLocation = (typeof panelLocations)[number];
 
 export const preferences = defineSettings({
   id: "preferences",
   scope: "host",
   version: 1,
   schema: z.object({
-    /** Where to show the terminal panel when a run starts from a wide window. */
-    openTerminal: z.enum(openTerminalOptions).default("explorer"),
+    /** Where "Run in side terminal", the Terminal button, and /run show the terminal panel. */
+    panelLocation: z.enum(panelLocations).default("explorer"),
+    /** Initial state of a run card's "Send to agent" checkbox. */
+    sendToAgent: z.boolean().default(true),
   }),
 });

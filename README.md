@@ -6,22 +6,24 @@ Two-way bridge between agent chats and Paseo terminals.
 (`bash`, `sh`, `shell`, `console`, `zsh`, `fish`, `python`, `js`/`node`) get a **Run in terminal**
 card under the reply:
 
-- **Run & send to agent** runs the block in the workspace terminal "Agent commands" and, when it
-  finishes, sends the command, exit code, and output to the agent as a new message. If the agent is
-  busy, delivery waits until its turn ends instead of interrupting it.
-- **Run only** runs it without sending; **Send output** sends it later.
+- **Run in side terminal** runs the block in the workspace terminal "Agent commands" and shows it in
+  the side panel; **Run silently** runs it without showing anything.
+- With **Send to agent** checked (the default), the command, exit code, and output go to the agent
+  as a new message when the block finishes. If the agent is busy, delivery waits until its turn
+  ends instead of interrupting it. Unchecked, **Send output** sends it later.
 - **Stop** sends Ctrl-C; **Send output so far** reports a still-running command.
 
-**Terminal panel.** The card's **Terminal** button shows "Agent commands" in the side panel
-(Explorer) as a full terminal: the same xterm.js renderer and live stream as Paseo's terminal tabs,
-with colors, the cursor, full-screen programs, and keyboard input. Click it and type to answer
-`sudo` passwords, `y/n` questions, or npm's "Press ENTER" without leaving the chat. Copy and paste
-with Ctrl-Shift-C and Ctrl-Shift-V; Ctrl-C goes to the shell. On phones the panel is a plain-text
-copy with an input line and Enter, Ctrl-C, Ctrl-D, and Tab keys. By default the panel opens
-whenever a run starts; change that under **Settings → Plugins → Terminal integration** (side panel,
-workspace tab, or don't open). Phones never switch tabs automatically.
+**Terminal panel.** The side panel (Explorer) shows "Agent commands" as a full terminal: the same
+xterm.js renderer and live stream as Paseo's terminal tabs, with colors, the cursor, full-screen
+programs, and keyboard input. Click it and type to answer `sudo` passwords, `y/n` questions, or
+npm's "Press ENTER" without leaving the chat. Copy and paste with Ctrl-Shift-C and Ctrl-Shift-V;
+Ctrl-C goes to the shell. The card's **Terminal** button opens it without running anything. On
+phones the panel is a plain-text copy with an input line and Enter, Ctrl-C, Ctrl-D, and Tab keys,
+in a tab that opens only when you ask. **Settings → Plugins → Terminal integration** switches the
+panel to a workspace tab and sets the checkbox's default.
 
-The terminal is a real PTY, so the native terminal tab works for prompts too. Runs in
+Paseo gives every workspace terminal its own tab, so "Agent commands" also appears in the tab bar
+(in the background). Closing that tab ends the terminal; the next run starts a new one. Runs in
 one workspace are queued so a command never types into another one's stdin. Each block runs as a
 script in the agent's working directory, so `cd` and `export` do not persist between runs.
 

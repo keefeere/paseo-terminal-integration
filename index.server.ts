@@ -39,7 +39,7 @@ export default function contribute(server: PluginServerContext) {
     if (!cardId) throw new Error("Command is too long");
     await runnerFor(paseo).start({ agentId, key: runKey(cardId, 0), ...block, send: true });
     const saved = await settings.read();
-    return { cardId, openTerminal: saved.status === "ready" ? saved.values.openTerminal : "off" };
+    return { cardId, panelLocation: saved.status === "ready" ? saved.values.panelLocation : "explorer" };
   });
 
   server.handle(scanBlocks, async ({ agentId }, { paseo }) => ({

@@ -46,17 +46,21 @@ export function RunCard({ item, agentId, theme, layout }: PluginTimelineItemProp
 
   const workspaceId = useAgent(agentId, (agent) => agent.workspaceId);
   const settings = useSettings(preferences);
-  function showTerminal(explicit: boolean) {
+  const saved = settings.status === "ready" ? settings.values : null;
+  const panelLocation = saved?.panelLocation ?? "explorer";
+  const [sendChoice, setSendChoice] = useState<boolean | null>(null);
+  const sendToAgent = sendChoice ?? saved?.sendToAgent ?? true;
+  const runVisibleLabel =
+    layout.compact || panelLocation === "workspace" ? "Run in terminal tab" : "Run in side terminal";
+
+  function showTerminal() {
     if (!workspaceId) return;
-    // Until the saved choice loads, only an explicit press opens the panel.
-    const saved = settings.status === "ready" ? settings.values.openTerminal : "off";
-    const where = explicit && saved === "off" ? "explorer" : saved;
-    openTerminalPanel(workspaceId, where, { compact: layout.compact, explicit });
+    openTerminalPanel(workspaceId, panelLocation, { compact: layout.compact, explicit: true });
   }
-  function runBlock(key: string, block: RunCardData["blocks"][number], sendOutput: boolean) {
+  function runBlock(key: string, block: RunCardData["blocks"][number], visible: boolean) {
     return act(key, async () => {
-      await start({ agentId, key, lang: block.lang, code: block.code, send: sendOutput });
-      showTerminal(false);
+      await start({ agentId, key, lang: block.lang, code: block.code, send: sendToAgent });
+      if (visible) showTerminal();
     });
   }
 
@@ -92,13 +96,20 @@ export function RunCard({ item, agentId, theme, layout }: PluginTimelineItemProp
           · {TERMINAL_NAME}
         </Text>
         <View style={styles.spacer} />
+        <Checkbox
+          styles={styles}
+          theme={theme}
+          label="Send to agent"
+          checked={sendToAgent}
+          onChange={setSendChoice}
+        />
         {workspaceId ? (
           <ActionButton
             styles={styles}
             theme={theme}
             icon="PanelRight"
             label="Terminal"
-            onPress={() => showTerminal(true)}
+            onPress={showTerminal}
           />
         ) : null}
       </View>
@@ -143,8 +154,8 @@ export function RunCard({ item, agentId, theme, layout }: PluginTimelineItemProp
                   <ActionButton
                     styles={styles}
                     theme={theme}
-                    icon="Play"
-                    label={run ? "Run again & send" : "Run & send to agent"}
+                    icon="PanelRight"
+                    label={runVisibleLabel}
                     tone="primary"
                     disabled={busy || active}
                     onPress={() => runBlock(key, block, true)}
@@ -152,8 +163,8 @@ export function RunCard({ item, agentId, theme, layout }: PluginTimelineItemProp
                   <ActionButton
                     styles={styles}
                     theme={theme}
-                    icon="SquareTerminal"
-                    label="Run only"
+                    icon="Play"
+                    label="Run silently"
                     disabled={busy || active}
                     onPress={() => runBlock(key, block, false)}
                   />
@@ -227,6 +238,37 @@ function RunStatus({ run, styles }: { run: RunSnapshot; styles: Styles }) {
   );
 }
 
+function Checkbox({
+  styles,
+  theme,
+  label,
+  checked,
+  onChange,
+}: {
+  styles: Styles;
+  theme: Theme;
+  label: string;
+  checked: boolean;
+  onChange(checked: boolean): void;
+}) {
+  return (
+    <Pressable
+      accessibilityRole="checkbox"
+      accessibilityLabel={label}
+      accessibilityState={{ checked }}
+      onPress={() => onChange(!checked)}
+      style={({ pressed }) => [styles.checkbox, { opacity: pressed ? 0.75 : 1 }]}
+    >
+      <Icon
+        name={checked ? "SquareCheck" : "Square"}
+        size={16}
+        color={checked ? theme.colors.accent : theme.colors.foregroundMuted}
+      />
+      <Text style={[styles.buttonText, { color: theme.colors.foreground }]}>{label}</Text>
+    </Pressable>
+  );
+}
+
 function ActionButton({
   styles,
   theme,
@@ -284,7 +326,19 @@ function createStyles(theme: Theme, compact: boolean) {
       padding: compact ? 10 : 12,
       backgroundColor: theme.colors.surface1,
     },
-    header: { flexDirection: "row" as const, alignItems: "center" as const, gap: 6 },
+    header: {
+      flexDirection: "row" as const,
+      flexWrap: "wrap" as const,
+      alignItems: "center" as const,
+      gap: 6,
+    },
+    checkbox: {
+      flexDirection: "row" as const,
+      alignItems: "center" as const,
+      gap: 6,
+      paddingHorizontal: 4,
+      paddingVertical: compact ? 7 : 5,
+    },
     title: { color: theme.colors.foreground, fontWeight: "600" as const },
     muted: { color: theme.colors.foregroundMuted, flexShrink: 1 },
     spacer: { flex: 1 },

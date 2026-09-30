@@ -1,12 +1,17 @@
 import { useSettings, type PluginSurfaceProps } from "@getpaseo/plugin/client";
-import { SettingsCard, SettingsRow, SettingsSection, SettingsSelect } from "@getpaseo/plugin/client/ui";
+import {
+  SettingsCard,
+  SettingsRow,
+  SettingsSection,
+  SettingsSelect,
+  SettingsSwitch,
+} from "@getpaseo/plugin/client/ui";
 import { Text } from "react-native";
-import { preferences, type OpenTerminalOption } from "../shared/settings";
+import { preferences, type PanelLocation } from "../shared/settings";
 
-const openTerminalChoices: { label: string; value: OpenTerminalOption }[] = [
+const panelLocationChoices: { label: string; value: PanelLocation }[] = [
   { label: "Side panel (Explorer)", value: "explorer" },
   { label: "Workspace tab", value: "workspace" },
-  { label: "Don't open", value: "off" },
 ];
 
 export function SettingsScreen({ theme }: PluginSurfaceProps) {
@@ -17,20 +22,26 @@ export function SettingsScreen({ theme }: PluginSurfaceProps) {
       settings.status === "loading" ? "Loading…" : `Settings are unavailable: ${settings.error}`;
     return <Text style={{ color: theme.colors.foregroundMuted }}>{message}</Text>;
   }
+  const { values, revision } = settings;
 
   return (
-    <SettingsSection title="Terminal panel">
+    <SettingsSection title="Run cards">
       <SettingsCard>
         <SettingsSelect
-          label="When a command starts, show the terminal in"
-          hint="Phones never switch tabs automatically; the Terminal button on a run card always works."
-          value={settings.values.openTerminal}
-          options={openTerminalChoices}
+          label="Show the terminal in"
+          hint={`Used by "Run in side terminal", the Terminal button, and /run. Phones always use a tab and never switch to it automatically.`}
+          value={values.panelLocation}
+          options={panelLocationChoices}
           disabled={settings.saving}
           error={settings.saveError}
-          onValueChange={(openTerminal) =>
-            void settings.save({ ...settings.values, openTerminal }, settings.revision)
-          }
+          onValueChange={(panelLocation) => void settings.save({ ...values, panelLocation }, revision)}
+        />
+        <SettingsSwitch
+          label="Send output to the agent by default"
+          hint={`Initial state of the "Send to agent" checkbox on each run card.`}
+          value={values.sendToAgent}
+          disabled={settings.saving}
+          onValueChange={(sendToAgent) => void settings.save({ ...values, sendToAgent }, revision)}
         />
         <SettingsRow
           label="What the panel shows"

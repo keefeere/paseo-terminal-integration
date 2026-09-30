@@ -1,5 +1,5 @@
 import type { PluginClientContext } from "@getpaseo/plugin/client";
-import { TERMINAL_PANEL_ID, type OpenTerminalOption } from "../shared/settings";
+import { TERMINAL_PANEL_ID, type PanelLocation } from "../shared/settings";
 
 type OpenPanel = PluginClientContext["openPanel"];
 
@@ -16,12 +16,11 @@ export function setPanelOpener(next: OpenPanel | null): void {
  */
 export function openTerminalPanel(
   workspaceId: string,
-  where: OpenTerminalOption,
+  where: PanelLocation,
   { compact, explicit }: { compact: boolean; explicit: boolean },
 ): void {
-  if (!openPanel || where === "off") return;
-  if (compact && !explicit) return;
-  const location = compact || where === "workspace" ? "workspace" : "explorer";
+  if (!openPanel || (compact && !explicit)) return;
+  const location = compact ? "workspace" : where;
   try {
     openPanel(TERMINAL_PANEL_ID, { workspaceId, location });
   } catch {
