@@ -11,6 +11,7 @@ import {
   startRun,
   TERMINAL_NAME,
   type RunCardData,
+  type RunMode,
   type RunSnapshot,
 } from "../shared/contracts";
 import { preferences } from "../shared/settings";
@@ -47,6 +48,12 @@ export function RunCard({ item, agentId, theme, layout }: PluginTimelineItemProp
   const [sendChoice, setSendChoice] = useState<boolean | null>(null);
   const sendToAgent =
     sendChoice ?? (settings.status === "ready" ? settings.values.sendToAgent : true);
+
+  function runBlock(key: string, block: RunCardData["blocks"][number], mode: RunMode) {
+    return act(key, () =>
+      start({ agentId, key, lang: block.lang, code: block.code, send: sendToAgent, mode }),
+    );
+  }
 
   const queryKey = useMemo(() => ["terminal-run-status", cardId], [cardId]);
   const status = useQuery({
@@ -130,14 +137,18 @@ export function RunCard({ item, agentId, theme, layout }: PluginTimelineItemProp
                     styles={styles}
                     theme={theme}
                     icon="Play"
-                    label={run ? "Run again" : "Run"}
+                    label="Run"
                     tone="primary"
                     disabled={busy || active}
-                    onPress={() =>
-                      act(key, () =>
-                        start({ agentId, key, lang: block.lang, code: block.code, send: sendToAgent }),
-                      )
-                    }
+                    onPress={() => runBlock(key, block, "terminal")}
+                  />
+                  <ActionButton
+                    styles={styles}
+                    theme={theme}
+                    icon="EyeOff"
+                    label="Run in background"
+                    disabled={busy || active}
+                    onPress={() => runBlock(key, block, "background")}
                   />
                   {run && !run.sent && !active ? (
                     <ActionButton
@@ -176,7 +187,9 @@ function RunStatus({ run, styles }: { run: RunSnapshot; styles: Styles }) {
   const parts: string[] = [];
   let tone: TextStyle = styles.muted;
   if (run.status === "queued") parts.push("Queued, waiting for the terminal");
-  if (run.status === "running") parts.push(`Running · ${elapsed(run)}`);
+  if (run.status === "running") {
+    parts.push(`${run.mode === "background" ? "Running in background" : "Running"} · ${elapsed(run)}`);
+  }
   if (run.status === "done") {
     parts.push(`${run.exitCode === 0 ? "✓" : "✗"} exit ${run.exitCode}`);
     tone = run.exitCode === 0 ? styles.success : styles.danger;

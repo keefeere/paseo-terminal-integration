@@ -31,7 +31,13 @@ export default function contribute(server: PluginServerContext) {
     const block = { lang: "bash", code: command };
     const cardId = await appendRunCard(paseo, agentId, [block]);
     if (!cardId) throw new Error("Command is too long");
-    await runnerFor(paseo).start({ agentId, key: runKey(cardId, 0), ...block, send: true });
+    await runnerFor(paseo).start({
+      agentId,
+      key: runKey(cardId, 0),
+      ...block,
+      send: true,
+      mode: "terminal",
+    });
     return { cardId };
   });
 

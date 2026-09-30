@@ -16,9 +16,14 @@ export function runKey(cardId: string, blockIndex: number): string {
   return `${cardId}:${blockIndex}`;
 }
 
+/** `terminal` types the block into "Agent commands"; `background` runs it with no terminal and no stdin. */
+export const runModes = ["terminal", "background"] as const;
+export type RunMode = (typeof runModes)[number];
+
 export const runSnapshotSchema = z.object({
   runId: z.string(),
   key: z.string(),
+  mode: z.enum(runModes),
   status: z.enum(["queued", "running", "done", "canceled", "failed"]),
   exitCode: z.number().int().nullable(),
   startedAt: z.number().nullable(),
@@ -40,6 +45,7 @@ export const startRun = defineRpc({
     lang: z.string(),
     code: z.string().min(1),
     send: z.boolean(),
+    mode: z.enum(runModes),
   }),
   output: runSnapshotSchema,
 });

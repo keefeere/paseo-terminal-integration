@@ -1,10 +1,12 @@
+import { spawn, type ChildProcess } from "node:child_process";
 import { randomUUID } from "node:crypto";
 import { mkdir, rm, writeFile } from "node:fs/promises";
-import { tmpdir } from "node:os";
+import { constants as osConstants, tmpdir } from "node:os";
 import path from "node:path";
+import { StringDecoder } from "node:string_decoder";
 import type { PluginHandlerContext } from "@getpaseo/plugin/server";
 import { interpreterFor, type Interpreter } from "../shared/code-blocks";
-import { TERMINAL_NAME, type RunSnapshot } from "../shared/contracts";
+import { TERMINAL_NAME, type RunMode, type RunSnapshot } from "../shared/contracts";
 import { fenced, trimBlankEdges } from "../shared/text";
 
 type Paseo = PluginHandlerContext["paseo"];
@@ -23,6 +25,9 @@ const TAIL_LINES = 6;
 const REPORT_MAX_LINES = 300;
 const REPORT_MAX_CHARS = 24_000;
 const FINISHED_RUN_LIMIT = 200;
+const BACKGROUND_MAX_LINES = 5_000;
+const BACKGROUND_MAX_LINE_CHARS = 16_000;
+const BACKGROUND_FLUSH_MS = 1_000;
 
 // sendKeys() expands only a few key names, so control characters are written as raw bytes.
 const CTRL_C = "\x03";
@@ -39,6 +44,7 @@ const EXTENSIONS: Record<Interpreter, string> = {
 interface Run {
   id: string;
   key: string;
+  mode: RunMode;
   agentId: string;
   workspaceId: string;
   cwd: string;
@@ -57,6 +63,7 @@ interface Run {
   error: string | null;
   cancelRequested: boolean;
   terminal: TerminalHandle | null;
+  process: ChildProcess | null;
 }
 
 export interface StartRunInput {
@@ -65,9 +72,13 @@ export interface StartRunInput {
   lang: string;
   code: string;
   send: boolean;
+  mode: RunMode;
 }
 
-/** Runs code blocks in a per-workspace Paseo terminal and reports output back to the agent. */
+/**
+ * Runs code blocks in a per-workspace Paseo terminal, or as background processes, and reports
+ * output back to the agent.
+ */
 export class TerminalRunner {
   private readonly runs = new Map<string, Run>();
   private readonly lanes = new Map<string, Promise<void>>();
@@ -90,6 +101,7 @@ export class TerminalRunner {
     const run: Run = {
       id: randomUUID().slice(0, 8),
       key: input.key,
+      mode: input.mode,
       agentId: input.agentId,
       workspaceId: agent.workspaceId,
       cwd: agent.cwd,
@@ -108,13 +120,19 @@ export class TerminalRunner {
       error: null,
       cancelRequested: false,
       terminal: null,
+      process: null,
     };
     this.runs.delete(input.key);
     this.runs.set(input.key, run);
     this.pruneFinished();
 
-    const lane = (this.lanes.get(run.workspaceId) ?? Promise.resolve()).then(() => this.execute(run));
-    this.lanes.set(run.workspaceId, lane);
+    if (run.mode === "background") {
+      // Background runs never touch the terminal, so they skip its queue.
+      void this.execute(run);
+    } else {
+      const lane = (this.lanes.get(run.workspaceId) ?? Promise.resolve()).then(() => this.execute(run));
+      this.lanes.set(run.workspaceId, lane);
+    }
     return snapshot(run);
   }
 
@@ -134,7 +152,13 @@ export class TerminalRunner {
       this.finish(run, "canceled");
     } else if (run.status === "running" && !run.cancelRequested) {
       run.cancelRequested = true;
-      run.terminal?.write(CTRL_C);
+      const child = run.process;
+      if (child) {
+        signalGroup(child, "SIGINT");
+        setTimeout(() => signalGroup(child, "SIGKILL"), CANCEL_GRACE_MS).unref();
+      } else {
+        run.terminal?.write(CTRL_C);
+      }
     }
     return snapshot(run);
   }
@@ -153,6 +177,7 @@ export class TerminalRunner {
   stop(): void {
     this.stopped = true;
     for (const run of this.runs.values()) {
+      if (run.process) signalGroup(run.process, "SIGTERM");
       if (run.status === "queued" || run.status === "running") {
         run.error = "Plugin stopped before the command finished";
         this.finish(run, "failed");
@@ -165,11 +190,15 @@ export class TerminalRunner {
     run.status = "running";
     run.startedAt = Date.now();
     try {
-      const terminal = await this.ensureTerminal(run.workspaceId, run.cwd);
-      run.terminal = terminal;
-      const wrapper = await writeScripts(run);
-      terminal.write(`${CTRL_U} bash ${shellQuote(wrapper)}\r`);
-      await this.watch(run, terminal);
+      if (run.mode === "background") {
+        await this.runInBackground(run);
+      } else {
+        const terminal = await this.ensureTerminal(run.workspaceId, run.cwd);
+        run.terminal = terminal;
+        const wrapper = await writeScripts(run);
+        terminal.write(`${CTRL_U} bash ${shellQuote(wrapper)}\r`);
+        await this.watch(run, terminal);
+      }
     } catch (error) {
       run.error = error instanceof Error ? error.message : String(error);
       this.finish(run, "failed");
@@ -224,6 +253,68 @@ export class TerminalRunner {
     if (run.status === "running") {
       run.error = "Stopped watching: the command ran longer than 6 hours";
       this.finish(run, "failed");
+    }
+  }
+
+  /** Runs the block as a child process with no terminal, stderr merged into stdout. */
+  private async runInBackground(run: Run): Promise<void> {
+    const codeFile = await writeCode(run);
+    const output = new OutputLines();
+    const sync = setInterval(() => (run.output = output.lines()), POLL_MS);
+    let timedOut = false;
+    try {
+      const exitCode = await new Promise<number>((resolve, reject) => {
+        // One pipe for both streams keeps their order, as a terminal shows it. The command gets
+        // its own process group, so Stop reaches its children too, and no controlling terminal or
+        // stdin, so a password prompt fails instead of waiting for input.
+        const child = spawn("/bin/sh", ["-c", 'exec "$@" 2>&1', "sh", run.interpreter, codeFile], {
+          cwd: run.cwd,
+          env: backgroundEnv(),
+          stdio: ["ignore", "pipe", "pipe"],
+          detached: true,
+        });
+        run.process = child;
+        const limit = setTimeout(() => {
+          timedOut = true;
+          signalGroup(child, "SIGKILL");
+        }, MAX_RUN_MS);
+        for (const stream of [child.stdout, child.stderr]) {
+          const decoder = new StringDecoder("utf8");
+          stream.on("data", (chunk: Buffer) => output.write(decoder.write(chunk)));
+        }
+        child.once("error", (error) => {
+          clearTimeout(limit);
+          reject(new Error(`Could not start the command in ${run.cwd}: ${error.message}`));
+        });
+        child.once("exit", (code, signal) => {
+          clearTimeout(limit);
+          const status = code ?? 128 + (signal ? osConstants.signals[signal] : 0);
+          // Output still in the pipes arrives before "close", but a leftover background job that
+          // holds them open must not keep the run going.
+          const flushed = setTimeout(() => {
+            child.stdout.destroy();
+            child.stderr.destroy();
+            resolve(status);
+          }, BACKGROUND_FLUSH_MS);
+          child.once("close", () => {
+            clearTimeout(flushed);
+            resolve(status);
+          });
+        });
+      });
+      run.output = trimBlankEdges(output.lines());
+      run.truncated = output.dropped > 0;
+      if (timedOut) {
+        run.error = "Stopped: the command ran longer than 6 hours";
+        this.finish(run, "failed");
+      } else {
+        run.exitCode = exitCode;
+        this.finish(run, run.cancelRequested ? "canceled" : "done");
+      }
+    } finally {
+      clearInterval(sync);
+      run.process = null;
+      await rm(codeFile, { force: true });
     }
   }
 
@@ -290,6 +381,7 @@ function snapshot(run: Run): RunSnapshot {
   return {
     runId: run.id,
     key: run.key,
+    mode: run.mode,
     status: run.status,
     exitCode: run.exitCode,
     startedAt: run.startedAt,
@@ -308,15 +400,13 @@ function snapshot(run: Run): RunSnapshot {
  * of the input line. The wrapper prints concealed begin/end markers around the command's output.
  */
 async function writeScripts(run: Run): Promise<string> {
-  await mkdir(SCRIPT_DIR, { recursive: true });
-  const codeFile = path.join(SCRIPT_DIR, `${run.id}.${EXTENSIONS[run.interpreter]}`);
+  const codeFile = await writeCode(run);
   const wrapper = path.join(SCRIPT_DIR, `${run.id}.run.sh`);
   const shell = run.interpreter === "bash" || run.interpreter === "zsh" || run.interpreter === "fish";
   const echo = shell
     ? `sed 's/^/$ /' -- ${shellQuote(codeFile)}`
     : `printf '# %s\\n' ${shellQuote(run.interpreter)}; cat -- ${shellQuote(codeFile)}`;
 
-  await writeFile(codeFile, `${run.code}\n`, "utf8");
   await writeFile(
     wrapper,
     [
@@ -338,6 +428,13 @@ async function writeScripts(run: Run): Promise<string> {
   return wrapper;
 }
 
+async function writeCode(run: Run): Promise<string> {
+  await mkdir(SCRIPT_DIR, { recursive: true });
+  const codeFile = path.join(SCRIPT_DIR, `${run.id}.${EXTENSIONS[run.interpreter]}`);
+  await writeFile(codeFile, `${run.code}\n`, "utf8");
+  return codeFile;
+}
+
 export async function cleanupScripts(): Promise<void> {
   await rm(SCRIPT_DIR, { recursive: true, force: true });
 }
@@ -353,7 +450,11 @@ function formatReport(run: Run): string {
           : "still running; partial output";
 
   let lines = run.output;
-  let note = run.truncated ? " (earlier lines scrolled out of the terminal)" : "";
+  let note = !run.truncated
+    ? ""
+    : run.mode === "background"
+      ? " (earlier lines were dropped)"
+      : " (earlier lines scrolled out of the terminal)";
   if (lines.length > REPORT_MAX_LINES) {
     note = ` (last ${REPORT_MAX_LINES} of ${lines.length} lines)`;
     lines = lines.slice(-REPORT_MAX_LINES);
@@ -364,8 +465,12 @@ function formatReport(run: Run): string {
     note = ` (last ${REPORT_MAX_CHARS} characters)`;
   }
 
+  const where =
+    run.mode === "background"
+      ? "in the background, with no terminal"
+      : `in the Paseo terminal "${TERMINAL_NAME}"`;
   return [
-    `I ran this in the Paseo terminal "${TERMINAL_NAME}" (cwd \`${run.cwd}\`), ${outcome}:`,
+    `I ran this ${where} (cwd \`${run.cwd}\`), ${outcome}:`,
     "",
     fenced(run.code, run.lang),
     "",
@@ -383,6 +488,59 @@ function withoutInterruptEcho(lines: string[]): string[] {
   let end = lines.length;
   while (end > 0 && /^\s*\^C\s*$/.test(lines[end - 1])) end--;
   return trimBlankEdges(lines.slice(0, end));
+}
+
+/** Terminals get the plugin's environment without the flag that runs Electron apps as Node. */
+function backgroundEnv(): NodeJS.ProcessEnv {
+  const { ELECTRON_RUN_AS_NODE: _electronAsNode, ...env } = process.env;
+  // Python block-buffers a pipe; unbuffered output keeps the card's tail live.
+  return { ...env, TERM: "dumb", PYTHONUNBUFFERED: "1" };
+}
+
+function signalGroup(child: ChildProcess, signal: NodeJS.Signals): void {
+  if (child.pid === undefined || child.exitCode !== null || child.signalCode !== null) return;
+  try {
+    process.kill(-child.pid, signal);
+  } catch {
+    // The group is already gone.
+  }
+}
+
+const ANSI_ESCAPE = /\x1b(?:\[[0-?]*[ -/]*[@-~]|\][^\x07\x1b]*(?:\x07|\x1b\\)?|[@-Z\\-_])/g;
+const CONTROL_CHARS = /[\x00-\x08\x0b\x0c\x0e-\x1f\x7f]/g;
+
+/** Program output as a terminal would show it, without colors: `\r` rewrites the current line. */
+class OutputLines {
+  private readonly finished: string[] = [];
+  private current = "";
+  dropped = 0;
+
+  write(text: string): void {
+    const [first, ...rest] = text.replace(ANSI_ESCAPE, "").replace(CONTROL_CHARS, "").split("\n");
+    this.current += first;
+    for (const part of rest) {
+      this.finished.push(overwrite(this.current));
+      this.current = part;
+    }
+    if (this.current.length > BACKGROUND_MAX_LINE_CHARS) {
+      this.current = overwrite(this.current).slice(-BACKGROUND_MAX_LINE_CHARS);
+    }
+    const excess = this.finished.length - BACKGROUND_MAX_LINES;
+    if (excess > 0) {
+      this.finished.splice(0, excess);
+      this.dropped += excess;
+    }
+  }
+
+  lines(): string[] {
+    return this.current ? [...this.finished, overwrite(this.current)] : [...this.finished];
+  }
+}
+
+/** Each segment after a carriage return overwrites the line from its start. */
+function overwrite(line: string): string {
+  if (!line.includes("\r")) return line;
+  return line.split("\r").reduce((shown, segment) => segment + shown.slice(segment.length));
 }
 
 function lastIndexWhere<T>(items: readonly T[], predicate: (item: T) => boolean): number {
