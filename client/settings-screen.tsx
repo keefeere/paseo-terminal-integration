@@ -45,7 +45,7 @@ export function SettingsScreen({ theme }: PluginSurfaceProps) {
         />
         <SettingsRow
           label="What the panel shows"
-          hint={`The live "Agent commands" terminal with colors and keyboard input, for prompts such as sudo passwords, y/n questions, or 2FA codes. Copy and paste with Ctrl-Shift-C and Ctrl-Shift-V. Phones show a plain-text copy with an input line.`}
+          hint={`The live "Agent commands" terminal with colors and keyboard input, for prompts such as sudo passwords, y/n questions, or 2FA codes. Ctrl-C copies while text is selected; Ctrl-Shift-C and Ctrl-Shift-V copy and paste. Phones show a plain-text copy with an input line.`}
         />
       </SettingsCard>
     </SettingsSection>

@@ -158,16 +158,20 @@ export function XtermView({
       term.onResize(({ rows, cols }) => {
         if (viewId) void latest.current.resize({ viewId, rows, cols }).catch(() => {});
       });
-      // Ctrl-C and Ctrl-V belong to the shell; copy and paste use Ctrl-Shift like Linux terminals.
+      // Copy and paste use Ctrl-Shift like Linux terminals. Ctrl-C also copies while text is
+      // selected, as in VS Code, so copying a URL cannot interrupt the prompt that printed it.
       term.attachCustomKeyEventHandler((event) => {
-        if (event.type !== "keydown" || !event.ctrlKey || !event.shiftKey) return true;
+        if (event.type !== "keydown" || !event.ctrlKey || event.altKey || event.metaKey) return true;
         const key = event.key.toLowerCase();
-        if (key === "c") {
-          if (term.hasSelection()) void navigator.clipboard?.writeText(term.getSelection());
+        if (key === "c" && (event.shiftKey || term.hasSelection())) {
+          if (term.hasSelection()) {
+            void navigator.clipboard?.writeText(term.getSelection());
+            if (!event.shiftKey) term.clearSelection();
+          }
           return false;
         }
         // Returning false leaves the browser's paste to xterm's textarea.
-        return key !== "v";
+        return !(key === "v" && event.shiftKey);
       });
 
       observer = new ResizeObserver(() => {
