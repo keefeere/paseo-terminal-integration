@@ -32,6 +32,7 @@ const FONT_SIZE = 13;
 const SCROLLBACK_LINES = 5_000;
 const RETRY_MS = 1_000;
 const FIT_DEBOUNCE_MS = 100;
+const FONT_WAIT_MS = 1_500;
 
 function errorMessage(error: unknown): string {
   return error instanceof Error ? error.message : String(error);
@@ -58,6 +59,19 @@ const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
 function openWebLink(uri: string) {
   if (/^https?:\/\//i.test(uri)) void Linking.openURL(uri).catch(() => {});
+}
+
+/** xterm measures the cell size once, so a font that loads later leaves gaps between letters. */
+async function fontsLoaded(): Promise<void> {
+  const fonts = typeof document === "undefined" ? undefined : document.fonts;
+  if (!fonts) return;
+  await Promise.race([
+    Promise.all([
+      fonts.load(`${FONT_SIZE}px ${FONT_FAMILY}`),
+      fonts.load(`bold ${FONT_SIZE}px ${FONT_FAMILY}`),
+    ]).catch(() => {}),
+    sleep(FONT_WAIT_MS),
+  ]);
 }
 
 /**
@@ -128,11 +142,15 @@ export function XtermView({
     }
 
     void (async () => {
-      const [{ Terminal }, { FitAddon }, { WebLinksAddon }] = await Promise.all([
-        import("@xterm/xterm/lib/xterm.mjs"),
-        import("@xterm/addon-fit/lib/addon-fit.mjs"),
-        import("@xterm/addon-web-links/lib/addon-web-links.mjs"),
-      ]);
+      const [{ Terminal }, { FitAddon }, { WebLinksAddon }, { WebglAddon }, { Unicode11Addon }] =
+        await Promise.all([
+          import("@xterm/xterm/lib/xterm.mjs"),
+          import("@xterm/addon-fit/lib/addon-fit.mjs"),
+          import("@xterm/addon-web-links/lib/addon-web-links.mjs"),
+          import("@xterm/addon-webgl/lib/addon-webgl.mjs"),
+          import("@xterm/addon-unicode11/lib/addon-unicode11.mjs"),
+          fontsLoaded(),
+        ]);
       if (disposed) return;
       const term = new Terminal({
         allowProposedApi: true,
@@ -151,7 +169,16 @@ export function XtermView({
       const fit = new FitAddon();
       term.loadAddon(fit);
       term.loadAddon(new WebLinksAddon((_event, uri) => openWebLink(uri)));
+      term.loadAddon(new Unicode11Addon());
+      term.unicode.activeVersion = "11";
       term.open(element);
+      // The GPU renderer, as in terminal tabs, keeps glyphs on the cell grid; without WebGL
+      // the DOM renderer stays in place.
+      try {
+        const webgl = new WebglAddon();
+        webgl.onContextLoss(() => webgl.dispose());
+        term.loadAddon(webgl);
+      } catch {}
       fit.fit();
 
       term.onData((data) => latest.current.paseo.terminals.ref(terminalId).write(data));

@@ -11,3 +11,11 @@ declare module "@xterm/addon-fit/lib/addon-fit.mjs" {
 declare module "@xterm/addon-web-links/lib/addon-web-links.mjs" {
   export * from "@xterm/addon-web-links";
 }
+
+declare module "@xterm/addon-webgl/lib/addon-webgl.mjs" {
+  export * from "@xterm/addon-webgl";
+}
+
+declare module "@xterm/addon-unicode11/lib/addon-unicode11.mjs" {
+  export * from "@xterm/addon-unicode11";
+}
