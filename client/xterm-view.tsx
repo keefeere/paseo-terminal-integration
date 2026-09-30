@@ -1,7 +1,7 @@
 import { usePaseo, useRpc, type PluginWorkspacePanelProps } from "@getpaseo/plugin/client";
 import type { ITheme, Terminal } from "@xterm/xterm";
 import { useEffect, useRef, useState } from "react";
-import { Text, View } from "react-native";
+import { Linking, Text, View } from "react-native";
 import {
   closeTerminalView,
   openTerminalView,
@@ -55,6 +55,10 @@ function terminalTheme(theme: Theme): ITheme {
 }
 
 const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+
+function openWebLink(uri: string) {
+  if (/^https?:\/\//i.test(uri)) void Linking.openURL(uri).catch(() => {});
+}
 
 /**
  * A live xterm.js view of a daemon terminal: the same stream and renderer as a terminal
@@ -124,9 +128,10 @@ export function XtermView({
     }
 
     void (async () => {
-      const [{ Terminal }, { FitAddon }] = await Promise.all([
+      const [{ Terminal }, { FitAddon }, { WebLinksAddon }] = await Promise.all([
         import("@xterm/xterm/lib/xterm.mjs"),
         import("@xterm/addon-fit/lib/addon-fit.mjs"),
+        import("@xterm/addon-web-links/lib/addon-web-links.mjs"),
       ]);
       if (disposed) return;
       const term = new Terminal({
@@ -136,6 +141,8 @@ export function XtermView({
         fontFamily: FONT_FAMILY,
         fontSize: FONT_SIZE,
         lineHeight: 1,
+        // OSC 8 hyperlinks; plain URLs in the output go through WebLinksAddon.
+        linkHandler: { activate: (_event, text) => openWebLink(text) },
         macOptionIsMeta: true,
         scrollback: SCROLLBACK_LINES,
         theme: terminalTheme(latest.current.theme),
@@ -143,6 +150,7 @@ export function XtermView({
       terminal.current = term;
       const fit = new FitAddon();
       term.loadAddon(fit);
+      term.loadAddon(new WebLinksAddon((_event, uri) => openWebLink(uri)));
       term.open(element);
       fit.fit();
 

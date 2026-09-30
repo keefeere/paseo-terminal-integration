@@ -17,7 +17,8 @@ card under the reply:
 xterm.js renderer and live stream as Paseo's terminal tabs, with colors, the cursor, full-screen
 programs, and keyboard input. Click it and type to answer `sudo` passwords, `y/n` questions, or
 npm's "Press ENTER" without leaving the chat. Copy and paste with Ctrl-Shift-C and Ctrl-Shift-V;
-Ctrl-C goes to the shell. The card's **Terminal** button opens it without running anything. On
+Ctrl-C goes to the shell; web links open in the browser when clicked. The card's **Terminal**
+button opens it without running anything. On
 phones the panel is a plain-text copy with an input line and Enter, Ctrl-C, Ctrl-D, and Tab keys,
 in a tab that opens only when you ask. **Settings → Plugins → Terminal integration** switches the
 panel to a workspace tab and sets the checkbox's default.

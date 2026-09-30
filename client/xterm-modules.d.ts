@@ -7,3 +7,7 @@ declare module "@xterm/xterm/lib/xterm.mjs" {
 declare module "@xterm/addon-fit/lib/addon-fit.mjs" {
   export * from "@xterm/addon-fit";
 }
+
+declare module "@xterm/addon-web-links/lib/addon-web-links.mjs" {
+  export * from "@xterm/addon-web-links";
+}
