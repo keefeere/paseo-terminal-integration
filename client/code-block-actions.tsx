@@ -1,184 +1,177 @@
-import { useRpc, useSettings, type PluginTimelineItemProps } from "@getpaseo/plugin/client";
-import { copyText, Icon, useToast } from "@getpaseo/plugin/client/react-native";
+import { useRpc, useSettings } from "@getpaseo/plugin/client";
+import type { PluginCodeBlockActionsProps } from "./sdk-compat";
+import { Icon } from "@getpaseo/plugin/client/react-native";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { useMemo, useState } from "react";
+import { useMemo } from "react";
 import { Platform, Pressable, Text, View, type TextStyle } from "react-native";
 import {
   cancelRun,
-  runKey,
+  inlineRunKey,
   runStatus,
   sendRunOutput,
   startRun,
-  TERMINAL_NAME,
-  type RunCardData,
   type RunMode,
   type RunSnapshot,
 } from "../shared/contracts";
+import { runnableBlock } from "../shared/code-blocks";
 import { preferences } from "../shared/settings";
+import { revealStartedRun } from "./reveal-run";
 
-type Theme = PluginTimelineItemProps["theme"];
+type Theme = PluginCodeBlockActionsProps["theme"];
 type Styles = ReturnType<typeof createStyles>;
-
 const POLL_MS = 700;
 const MONOSPACE = Platform.select({
   ios: "Menlo",
   android: "monospace",
   default: "ui-monospace, SFMono-Regular, Menlo, Consolas, monospace",
 });
-
-function isActive(run: RunSnapshot): boolean {
-  if (run.status === "queued" || run.status === "running" || run.sending) return true;
-  return run.status === "done" && run.sendOnFinish && !run.sent && !run.error;
+interface Controls {
+  pending: boolean;
+  send: boolean | null;
+  error: string | null;
 }
-
-export function RunCard({ item, agentId, theme, layout }: PluginTimelineItemProps<RunCardData>) {
-  const { cardId, blocks } = item.data;
-  const keys = useMemo(() => blocks.map((_, index) => runKey(cardId, index)), [cardId, blocks]);
+const INITIAL_CONTROLS: Controls = { pending: false, send: null, error: null };
+function isActive(run: RunSnapshot): boolean {
+  return run.status === "queued" || run.status === "running" || run.sending;
+}
+export function CodeBlockActions(props: PluginCodeBlockActionsProps) {
+  const block = runnableBlock(props.code, props.language);
+  if (!block) return null;
+  return <RunnableActions {...props} command={block.code} />;
+}
+function RunnableActions({
+  agentId,
+  messageId,
+  blockIndex,
+  host,
+  theme,
+  layout,
+  language,
+  phase,
+  navigation,
+  command,
+}: PluginCodeBlockActionsProps & { command: string }) {
+  const key = inlineRunKey(host.id, agentId, messageId, blockIndex);
+  const queryKey = useMemo(() => ["terminal-run-status", key], [key]);
+  const controlsKey = useMemo(() => ["terminal-run-controls", key], [key]);
   const styles = useMemo(() => createStyles(theme, layout.compact), [theme, layout.compact]);
-  const toast = useToast();
   const queryClient = useQueryClient();
-  const [pending, setPending] = useState<string | null>(null);
-
   const fetchStatus = useRpc(runStatus);
   const start = useRpc(startRun);
   const cancel = useRpc(cancelRun);
   const send = useRpc(sendRunOutput);
-
   const settings = useSettings(preferences);
-  const [sendChoice, setSendChoice] = useState<boolean | null>(null);
+  const { data: controls = INITIAL_CONTROLS } = useQuery<Controls>({
+    queryKey: controlsKey,
+    queryFn: () => INITIAL_CONTROLS,
+    initialData: INITIAL_CONTROLS,
+    enabled: false,
+    gcTime: Infinity,
+  });
+  const updateControls = (patch: Partial<Controls>) =>
+    queryClient.setQueryData<Controls>(controlsKey, (previous) => ({
+      ...INITIAL_CONTROLS,
+      ...previous,
+      ...patch,
+    }));
   const sendToAgent =
-    sendChoice ?? (settings.status === "ready" ? settings.values.sendToAgent : true);
-
-  function runBlock(key: string, block: RunCardData["blocks"][number], mode: RunMode) {
-    return act(key, () =>
-      start({ agentId, key, lang: block.lang, code: block.code, send: sendToAgent, mode }),
-    );
-  }
-
-  const queryKey = useMemo(() => ["terminal-run-status", cardId], [cardId]);
+    controls.send ?? (settings.status === "ready" ? settings.values.sendToAgent : true);
   const status = useQuery({
     queryKey,
-    queryFn: () => fetchStatus({ keys }),
+    queryFn: () => fetchStatus({ keys: [key] }),
     refetchInterval: (query) => (query.state.data?.runs.some(isActive) ? POLL_MS : false),
   });
-  const runs = useMemo(
-    () => new Map((status.data?.runs ?? []).map((run) => [run.key, run])),
-    [status.data],
-  );
-
-  async function act(key: string, action: () => Promise<unknown>) {
-    setPending(key);
+  const run = status.data?.runs[0];
+  const running = run?.status === "queued" || run?.status === "running";
+  const disabled = controls.pending || (!!run && isActive(run)) || phase !== "complete";
+  async function act(action: () => Promise<unknown>) {
+    if (queryClient.getQueryData<Controls>(controlsKey)?.pending) return;
+    updateControls({ pending: true, error: null });
     try {
       await action();
       await queryClient.invalidateQueries({ queryKey });
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : String(error));
+      updateControls({ error: error instanceof Error ? error.message : String(error) });
     } finally {
-      setPending(null);
+      updateControls({ pending: false });
     }
   }
-
+  function runBlock(mode: RunMode) {
+    if (disabled) return;
+    void act(async () => {
+      const started = await start({
+        agentId,
+        key,
+        lang: language,
+        code: command,
+        send: sendToAgent,
+        mode,
+      });
+      queryClient.setQueryData(queryKey, { runs: [started] });
+      // Owned by this click, not by rendering or polling: remounts cannot steal focus.
+      void revealStartedRun(started, navigation?.openTerminal, fetchStatus).catch((error) =>
+        updateControls({ error: error instanceof Error ? error.message : String(error) }),
+      );
+    });
+  }
   return (
     <View style={styles.card}>
-      <View style={styles.header}>
-        <Icon name="SquareTerminal" size={16} color={theme.colors.foregroundMuted} />
-        <Text style={styles.title}>Run in terminal</Text>
-        <Text style={styles.muted} numberOfLines={1}>
-          · {TERMINAL_NAME}
-        </Text>
-        <View style={styles.spacer} />
+      <View style={styles.actions}>
+        {running ? (
+          <ActionButton
+            styles={styles}
+            theme={theme}
+            icon="Square"
+            label="Stop"
+            tone="danger"
+            disabled={controls.pending}
+            onPress={() => void act(() => cancel({ key }))}
+          />
+        ) : (
+          <>
+            <ActionButton
+              styles={styles}
+              theme={theme}
+              icon="Play"
+              label="Run"
+              tone="primary"
+              disabled={disabled}
+              onPress={() => runBlock("terminal")}
+            />
+            <ActionButton
+              styles={styles}
+              theme={theme}
+              icon="EyeOff"
+              label="Run in background"
+              disabled={disabled}
+              onPress={() => runBlock("background")}
+            />
+          </>
+        )}
         <Checkbox
           styles={styles}
           theme={theme}
           label="Send output to agent"
           checked={sendToAgent}
-          onChange={setSendChoice}
+          onChange={(value) => updateControls({ send: value })}
         />
+        {run && !run.sent && !run.sending && (!running || !run.sendOnFinish) ? (
+          <ActionButton
+            styles={styles}
+            theme={theme}
+            icon="Send"
+            label={running ? "Send output so far" : "Send output"}
+            disabled={controls.pending}
+            onPress={() => void act(() => send({ key }))}
+          />
+        ) : null}
       </View>
-      {blocks.map((block, index) => {
-        const key = keys[index];
-        const run = runs.get(key);
-        const active = run ? isActive(run) : false;
-        const busy = pending === key;
-        return (
-          <View key={key} style={index > 0 ? [styles.block, styles.separated] : styles.block}>
-            <View style={styles.codeRow}>
-              <Text style={styles.lang}>{block.lang}</Text>
-              <Text style={styles.code} numberOfLines={3}>
-                {block.code}
-              </Text>
-            </View>
-            <View style={styles.actions}>
-              {run && (run.status === "queued" || run.status === "running") ? (
-                <>
-                  <ActionButton
-                    styles={styles}
-                    theme={theme}
-                    icon="Square"
-                    label="Stop"
-                    tone="danger"
-                    disabled={busy}
-                    onPress={() => act(key, () => cancel({ key }))}
-                  />
-                  {run.status === "running" && !run.sendOnFinish ? (
-                    <ActionButton
-                      styles={styles}
-                      theme={theme}
-                      icon="Send"
-                      label="Send output so far"
-                      disabled={busy || run.sending}
-                      onPress={() => act(key, () => send({ key }))}
-                    />
-                  ) : null}
-                </>
-              ) : (
-                <>
-                  <ActionButton
-                    styles={styles}
-                    theme={theme}
-                    icon="Play"
-                    label="Run"
-                    tone="primary"
-                    disabled={busy || active}
-                    onPress={() => runBlock(key, block, "terminal")}
-                  />
-                  <ActionButton
-                    styles={styles}
-                    theme={theme}
-                    icon="EyeOff"
-                    label="Run in background"
-                    disabled={busy || active}
-                    onPress={() => runBlock(key, block, "background")}
-                  />
-                  {run && !run.sent && !active ? (
-                    <ActionButton
-                      styles={styles}
-                      theme={theme}
-                      icon="Send"
-                      label="Send output"
-                      disabled={busy}
-                      onPress={() => act(key, () => send({ key }))}
-                    />
-                  ) : null}
-                </>
-              )}
-              <ActionButton
-                styles={styles}
-                theme={theme}
-                icon="Copy"
-                label="Copy"
-                onPress={() =>
-                  act(key, async () => {
-                    await copyText(block.code);
-                    toast.show("Command copied", { variant: "success" });
-                  })
-                }
-              />
-            </View>
-            {run ? <RunStatus run={run} styles={styles} /> : null}
-          </View>
-        );
-      })}
+      {phase !== "complete" ? (
+        <Text style={styles.muted}>Available when the response finishes</Text>
+      ) : null}
+      {controls.error ? <Text style={styles.danger}>{controls.error}</Text> : null}
+      {status.error ? <Text style={styles.danger}>{status.error.message}</Text> : null}
+      {run ? <RunStatus run={run} styles={styles} /> : null}
     </View>
   );
 }

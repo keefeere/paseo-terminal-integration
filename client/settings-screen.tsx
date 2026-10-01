@@ -20,11 +20,11 @@ export function SettingsScreen({ theme }: PluginSurfaceProps) {
   const { values, revision } = settings;
 
   return (
-    <SettingsSection title="Run cards">
+    <SettingsSection title="Code block actions">
       <SettingsCard>
         <SettingsSwitch
           label="Send output to the agent by default"
-          hint={`Initial state of the "Send output to agent" checkbox on each run card.`}
+          hint={`Initial state of the "Send output to agent" checkbox on each code block.`}
           value={values.sendToAgent}
           disabled={settings.saving}
           error={settings.saveError}
@@ -32,7 +32,7 @@ export function SettingsScreen({ theme }: PluginSurfaceProps) {
         />
         <SettingsRow
           label="Where the terminal appears"
-          hint={`Commands run in the "${TERMINAL_NAME}" terminal tab. To keep it beside the chat, drag the tab onto the right or bottom edge of the chat; it stays there while the terminal is open.`}
+          hint={`Commands run in the "${TERMINAL_NAME}" terminal tab. Choose Main panel or On the side in Settings → Layout → Open location → Terminals. Manually moved tabs keep their location.`}
         />
       </SettingsCard>
     </SettingsSection>

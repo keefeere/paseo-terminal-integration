@@ -3,6 +3,16 @@ import { z } from "zod";
 
 export const TERMINAL_NAME = "Agent commands";
 
+export function inlineRunKey(
+  hostId: string,
+  agentId: string,
+  messageId: string,
+  blockIndex: number,
+): string {
+  return JSON.stringify([hostId, agentId, messageId, blockIndex]);
+}
+
+// COMPAT(legacyRunCards): added in the inline-actions fork, remove after 2027-04-01.
 export const RUN_CARD_KIND = "terminal-run-card";
 export const RUN_CARD_VERSION = 1;
 
@@ -22,6 +32,8 @@ export type RunMode = (typeof runModes)[number];
 
 export const runSnapshotSchema = z.object({
   runId: z.string(),
+  workspaceId: z.string(),
+  terminalId: z.string().nullable(),
   key: z.string(),
   mode: z.enum(runModes),
   status: z.enum(["queued", "running", "done", "canceled", "failed"]),
@@ -43,7 +55,7 @@ export const startRun = defineRpc({
     agentId: z.string(),
     key: z.string(),
     lang: z.string(),
-    code: z.string().min(1),
+    code: z.string().min(1).max(8_000),
     send: z.boolean(),
     mode: z.enum(runModes),
   }),
@@ -78,6 +90,12 @@ export const scanBlocks = defineRpc({
   name: "blocks.scan",
   input: z.object({ agentId: z.string() }),
   output: z.object({ count: z.number().int() }),
+});
+
+export const enableLegacyCards = defineRpc({
+  name: "legacy.cards.enable",
+  input: z.object({}),
+  output: z.object({ enabled: z.boolean() }),
 });
 
 export const searchTerminalOutput = defineRpc({

@@ -4,6 +4,7 @@ import { appendCardForTurn, appendRunCard, scanLatestReply } from "./server/card
 import { cleanupScripts, TerminalRunner } from "./server/runner";
 import { preferences } from "./shared/settings";
 import {
+  enableLegacyCards,
   cancelRun,
   runAdhoc,
   runKey,
@@ -20,7 +21,15 @@ export default function contribute(server: PluginServerContext) {
   const runnerFor = (paseo: ConstructorParameters<typeof TerminalRunner>[0]) =>
     (runner ??= new TerminalRunner(paseo));
 
-  server.on("agent.turn_ended", (event, { paseo }) => appendCardForTurn(paseo, event));
+  // COMPAT(legacyRunCards): only old clients opt into scanning; remove after 2027-04-01.
+  let legacyCardsRequested = false;
+  server.handle(enableLegacyCards, async () => {
+    legacyCardsRequested = true;
+    return { enabled: true };
+  });
+  server.on("agent.turn_ended", (event, { paseo }) => {
+    if (legacyCardsRequested) return appendCardForTurn(paseo, event);
+  });
 
   server.handle(startRun, (input, { paseo }) => runnerFor(paseo).start(input));
   server.handle(runStatus, ({ keys }, { paseo }) => ({ runs: runnerFor(paseo).status(keys) }));

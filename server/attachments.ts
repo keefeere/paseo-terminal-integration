@@ -32,7 +32,9 @@ export async function searchTerminals(
 
   const items = await Promise.all(
     matches.map(async (entry) => {
-      const capture = await paseo.terminals.ref(entry).capture({ start: -lineCount, stripAnsi: true });
+      const capture = await paseo.terminals
+        .ref(entry)
+        .capture({ start: -lineCount, stripAnsi: true });
       const lines = trimBlankEdges(withoutRunMarkers(capture.lines));
       const name = entry.name || "Terminal";
       const workspace = workspaceNames.get(entry.workspaceId);

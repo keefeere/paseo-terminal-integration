@@ -130,7 +130,9 @@ export class TerminalRunner {
       // Background runs never touch the terminal, so they skip its queue.
       void this.execute(run);
     } else {
-      const lane = (this.lanes.get(run.workspaceId) ?? Promise.resolve()).then(() => this.execute(run));
+      const lane = (this.lanes.get(run.workspaceId) ?? Promise.resolve()).then(() =>
+        this.execute(run),
+      );
       this.lanes.set(run.workspaceId, lane);
     }
     return snapshot(run);
@@ -380,6 +382,8 @@ function finishedCleanly(run: Run): boolean {
 function snapshot(run: Run): RunSnapshot {
   return {
     runId: run.id,
+    workspaceId: run.workspaceId,
+    terminalId: run.terminal?.id ?? null,
     key: run.key,
     mode: run.mode,
     status: run.status,
@@ -402,7 +406,8 @@ function snapshot(run: Run): RunSnapshot {
 async function writeScripts(run: Run): Promise<string> {
   const codeFile = await writeCode(run);
   const wrapper = path.join(SCRIPT_DIR, `${run.id}.run.sh`);
-  const shell = run.interpreter === "bash" || run.interpreter === "zsh" || run.interpreter === "fish";
+  const shell =
+    run.interpreter === "bash" || run.interpreter === "zsh" || run.interpreter === "fish";
   const echo = shell
     ? `sed 's/^/$ /' -- ${shellQuote(codeFile)}`
     : `printf '# %s\\n' ${shellQuote(run.interpreter)}; cat -- ${shellQuote(codeFile)}`;
@@ -506,7 +511,10 @@ function signalGroup(child: ChildProcess, signal: NodeJS.Signals): void {
   }
 }
 
+// Terminal output cleaning deliberately matches ANSI and control bytes.
+// oxlint-disable-next-line no-control-regex
 const ANSI_ESCAPE = /\x1b(?:\[[0-?]*[ -/]*[@-~]|\][^\x07\x1b]*(?:\x07|\x1b\\)?|[@-Z\\-_])/g;
+// oxlint-disable-next-line no-control-regex
 const CONTROL_CHARS = /[\x00-\x08\x0b\x0c\x0e-\x1f\x7f]/g;
 
 /** Program output as a terminal would show it, without colors: `\r` rewrites the current line. */

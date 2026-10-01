@@ -2,13 +2,16 @@
 
 Two-way bridge between agent chats and Paseo terminals.
 
-**Agent → terminal.** When a turn ends, runnable fenced code blocks in the agent's reply
-(`bash`, `sh`, `shell`, `console`, `zsh`, `fish`, `python`, `js`/`node`) get a **Run in terminal**
-card under the reply:
+**Agent → terminal.** Runnable fenced code blocks in the agent's reply (`bash`, `sh`, `shell`,
+`console`, `zsh`, `fish`, `python`, `js`/`node`) get run controls. On Paseo builds with inline code
+block actions ([getpaseo/paseo#5874](https://github.com/getpaseo/paseo/pull/5874)) the controls sit
+directly under each block, including in older messages as history loads, and become available when
+the reply finishes. On other Paseo versions a **Run in terminal** card appears under the reply.
 
 - **Run** runs the block in the workspace terminal "Agent commands", a regular Paseo terminal tab.
+  With inline controls, Run also opens that tab.
 - **Run in background** runs it as a hidden process in the agent's working directory: no terminal
-  tab, and the card keeps the last 5,000 lines instead of what fits on a terminal screen. Nothing
+  tab, and the runner keeps the last 5,000 lines instead of what fits on a terminal screen. Nothing
   can be typed into it: stdin is empty, so password and confirmation prompts fail instead of
   waiting. Background runs do not wait for the terminal.
 - With **Send output to agent** checked (the default), the command, exit code, and output go to
@@ -16,12 +19,11 @@ card under the reply:
   its turn ends instead of interrupting it. Unchecked, **Send output** sends it later.
 - **Stop** sends Ctrl-C; **Send output so far** reports a still-running command.
 
-**Terminal beside the chat.** "Agent commands" opens as a background tab. Drag the tab onto the
-right or bottom edge of the chat to split the workspace; it stays there while the terminal is open,
-so you can watch runs and type answers to `sudo` passwords or `y/n` questions next to the
-conversation. From the keyboard, split the pane and move the tab into it with the shortcuts in
-**Settings → Shortcuts → Tabs & panes**. Closing the tab ends the terminal; the next run starts a
-new one in a new tab.
+**Terminal beside the chat.** On Paseo builds with the terminal open-location setting, choose
+**Settings → Layout → Open location → Opening a terminal → On the side** and "Agent commands"
+opens beside the chat. Elsewhere, drag the tab onto the right or bottom edge of the chat to split
+the workspace. A tab you moved stays where you put it while the terminal is open. Background runs
+never change the layout.
 
 Terminal runs in one workspace are queued so a command never types into another one's stdin.
 Each block runs as a script in the agent's working directory, so `cd` and `export` do not persist
@@ -47,22 +49,28 @@ Nothing runs until you press a button or submit `/run`.
 
 ## Commands
 
-| Command                                         | Effect                                                      |
-| ----------------------------------------------- | ----------------------------------------------------------- |
-| `/run <command>`                                | Run a shell command and send its output to the agent        |
-| `/blocks`                                       | Add a run card for the latest reply (e.g. older chats)      |
-| ⌘K / Ctrl+K → "Terminal: add run buttons to …"  | Same as `/blocks`                                           |
+| Command                                        | Effect                                                 |
+| ---------------------------------------------- | ------------------------------------------------------ |
+| `/run <command>`                               | Run a shell command and send its output to the agent   |
+| `/blocks`                                      | Add a run card for the latest reply (e.g. older chats) |
+| ⌘K / Ctrl+K → "Terminal: add run buttons to …" | Same as `/blocks`                                      |
+
+The commands are available on Paseo versions without inline code block actions.
 
 ## Limitations
 
 - Terminal output is read from the screen, so very long lines arrive wrapped and only the last
   3,000 rows are visible. The agent receives at most 300 lines or 24,000 characters.
-- Run state lives in the plugin process; reloading the plugin forgets it (the cards stay).
-- Plugins cannot split panes or move tabs, so placing the terminal beside the chat is up to you.
+- Run state lives in the plugin process; reloading the plugin forgets it. Controls and cards stay,
+  and nothing is re-run.
 - A command that has not started within 20 seconds fails, for example when something else is
   running in "Agent commands".
 
 ## Develop
+
+The inline code block action types are not in a published `@getpaseo/plugin` yet, so
+`client/sdk-compat.ts` declares them. Delete it once the SDK exports them. Use npm 11 for
+`npm install`: npm 10 crashes on this dependency tree.
 
 ```bash
 npm install

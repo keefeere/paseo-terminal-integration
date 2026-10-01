@@ -73,7 +73,8 @@ export function runnableBlocks(markdown: string): CodeBlock[] {
 function normalizeCommand(block: CodeBlock): string {
   const lines = block.code.split("\n");
   const prompted = lines.filter((line) => /^\s*\$ /.test(line));
-  const allPrompted = prompted.length > 0 && prompted.length === lines.filter((l) => l.trim()).length;
+  const allPrompted =
+    prompted.length > 0 && prompted.length === lines.filter((l) => l.trim()).length;
   if (!PROMPT_LANGUAGES.has(block.lang) && !allPrompted) return block.code;
   if (prompted.length === 0) return block.code;
   return prompted.map((line) => line.replace(/^\s*\$ /, "")).join("\n");
@@ -83,4 +84,15 @@ function stripIndent(line: string, indent: number): string {
   let index = 0;
   while (index < indent && line[index] === " ") index++;
   return line.slice(index);
+}
+
+export const RUNNABLE_LANGUAGES = Object.keys(INTERPRETERS);
+
+/** Receives one already-parsed fence from Paseo, never scans Markdown. */
+export function runnableBlock(code: string, language: string): CodeBlock | null {
+  const lang = language.toLowerCase();
+  if (!interpreterFor(lang)) return null;
+  const normalized = normalizeCommand({ code, lang }).trim();
+  if (!normalized || normalized.length > 8_000) return null;
+  return { lang, code: normalized };
 }
