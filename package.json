@@ -1,6 +1,6 @@
 {
   "name": "paseo-terminal-integration",
-  "version": "0.4.0",
+  "version": "0.5.0",
   "description": "Run agent code blocks in a Paseo terminal and send the output back to the agent; attach terminal output to prompts",
   "keywords": [
     "agents",
