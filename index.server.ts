@@ -1,6 +1,7 @@
 import type { PluginServerContext } from "@getpaseo/plugin/server";
 import { searchTerminals } from "./server/attachments";
 import { appendCardForTurn, appendRunCard, scanLatestReply } from "./server/cards";
+import { injectCommandInstructions, selectedCommandInstructions } from "./server/instructions";
 import { cleanupScripts, TerminalRunner } from "./server/runner";
 import { preferences } from "./shared/settings";
 import {
@@ -16,10 +17,24 @@ import {
 } from "./shared/contracts";
 
 export default function contribute(server: PluginServerContext) {
-  server.registerSettings(preferences);
+  const settings = server.registerSettings(preferences);
   let runner: TerminalRunner | null = null;
   const runnerFor = (paseo: ConstructorParameters<typeof TerminalRunner>[0]) =>
     (runner ??= new TerminalRunner(paseo));
+
+  server.before("agent.create", async ({ request }) => {
+    const state = await settings.read();
+    if (state.status !== "ready") return;
+    const instructions = selectedCommandInstructions(state.values);
+    if (!instructions) return;
+    return {
+      ...request,
+      config: {
+        ...request.config,
+        systemPrompt: injectCommandInstructions(request.config.systemPrompt, instructions),
+      },
+    };
+  });
 
   // COMPAT(legacyRunCards): only old clients opt into scanning; remove after 2027-04-01.
   let legacyCardsRequested = false;

@@ -29,6 +29,22 @@ Terminal runs in one workspace are queued so a command never types into another 
 Each block runs as a script in the agent's working directory, so `cd` and `export` do not persist
 between runs. **Settings → Plugins → Terminal integration** sets the checkbox's default.
 
+**Command guidance for agents.** The same settings screen can add command-formatting and execution
+guidance to the system prompt of newly created agents. Turn on **Inject command instructions** and
+choose one topology:
+
+- **Local daemon** tells the agent that Run already executes on the local Paseo daemon host, so it
+  should not add SSH merely to reach that machine.
+- **Client–server** tells the agent that the UI and daemon may be on different devices. Commands for
+  the daemon need no prefix; commands for another machine must include an explicit transport such
+  as SSH, using a destination supplied by the user rather than an invented host.
+
+Both templates are editable and stored per host. The shipped defaults are also available as
+[`local-daemon.md`](instructions/local-daemon.md) and
+[`client-server.md`](instructions/client-server.md), and each editor has a restore-default action.
+Changing or enabling the setting affects only agents created afterward; it does not rewrite the
+system prompt of an existing agent.
+
 **Terminal → agent.** In the composer's attachment menu, **Terminal output** attaches the latest
 lines of any terminal on the daemon. Type part of a name or path to filter, and a number to choose
 the line count (`build 500`; default 200).
