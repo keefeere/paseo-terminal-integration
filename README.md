@@ -17,6 +17,8 @@ the reply finishes. On other Paseo versions a **Run in terminal** card appears u
 - With **Send output to agent** checked (the default), the command, exit code, and output go to
   the agent as a new message when the block finishes. If the agent is busy, delivery waits until
   its turn ends instead of interrupting it. Unchecked, **Send output** sends it later.
+- Sent output longer than 20 lines starts collapsed. Change the threshold under
+  **Settings → Plugins → Terminal integration**, or set it to 0 to keep output expanded.
 - **Stop** sends Ctrl-C; **Send output so far** reports a still-running command.
 
 **Terminal beside the chat.** On Paseo builds with the terminal open-location setting, choose

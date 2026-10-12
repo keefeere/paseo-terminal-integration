@@ -8,6 +8,7 @@ vi.mock("@getpaseo/plugin/client/react-native", () => ({
 }));
 vi.mock("@getpaseo/plugin/client/ui", () => ({
   SettingsCard: () => null,
+  SettingsInput: () => null,
   SettingsRow: () => null,
   SettingsSection: () => null,
   SettingsSwitch: () => null,
@@ -23,6 +24,7 @@ describe("old and new Paseo clients", () => {
   function client(modern: boolean) {
     const methods = {
       addCodeBlockActions: modern ? vi.fn() : undefined,
+      addTimelineTransformer: vi.fn(),
       addTimelineRenderer: vi.fn(),
       addSettingsScreen: vi.fn(),
       addAttachmentSource: vi.fn(),
@@ -38,7 +40,13 @@ describe("old and new Paseo clients", () => {
     expect(methods.addCodeBlockActions).toHaveBeenCalledTimes(1);
     expect(methods.rpc).not.toHaveBeenCalled();
     expect(methods.addSlashCommand).not.toHaveBeenCalled();
-    expect(methods.addTimelineRenderer.mock.calls[0][0].Component()).toBeNull();
+    const legacyRenderer = methods.addTimelineRenderer.mock.calls
+      .map(([renderer]) => renderer)
+      .find((renderer) => renderer.kind === "terminal-run-card");
+    expect(legacyRenderer?.Component()).toBeNull();
+    expect(methods.addTimelineTransformer).toHaveBeenCalledWith(
+      expect.objectContaining({ id: "terminal-run-report" }),
+    );
   });
   it("retains cards, /run, /blocks and activates scans on old clients", async () => {
     const { methods, context } = client(false);
@@ -49,7 +57,9 @@ describe("old and new Paseo clients", () => {
       "run",
       "blocks",
     ]);
-    expect(methods.addTimelineRenderer.mock.calls[0][0].kind).toBe("terminal-run-card");
+    expect(methods.addTimelineRenderer.mock.calls.map(([renderer]) => renderer.kind)).toContain(
+      "terminal-run-card",
+    );
     expect(methods.addSettingsScreen).toHaveBeenCalledTimes(1);
     expect(methods.addAttachmentSource).toHaveBeenCalledTimes(1);
   });

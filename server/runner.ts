@@ -7,7 +7,8 @@ import { StringDecoder } from "node:string_decoder";
 import type { PluginHandlerContext } from "@getpaseo/plugin/server";
 import { interpreterFor, type Interpreter } from "../shared/code-blocks";
 import { TERMINAL_NAME, type RunMode, type RunSnapshot } from "../shared/contracts";
-import { fenced, trimBlankEdges } from "../shared/text";
+import { formatRunReport } from "../shared/run-report";
+import { trimBlankEdges } from "../shared/text";
 
 type Paseo = PluginHandlerContext["paseo"];
 type TerminalHandle = ReturnType<Paseo["terminals"]["ref"]>;
@@ -474,14 +475,13 @@ function formatReport(run: Run): string {
     run.mode === "background"
       ? "in the background, with no terminal"
       : `in the Paseo terminal "${TERMINAL_NAME}"`;
-  return [
-    `I ran this ${where} (cwd \`${run.cwd}\`), ${outcome}:`,
-    "",
-    fenced(run.code, run.lang),
-    "",
-    output ? `Output${note}:` : "It printed no output.",
-    ...(output ? ["", fenced(output, "text")] : []),
-  ].join("\n");
+  return formatRunReport({
+    intro: `I ran this ${where} (cwd \`${run.cwd}\`), ${outcome}:`,
+    language: run.lang,
+    code: run.code,
+    outputLabel: output ? `Output${note}:` : "It printed no output.",
+    output,
+  });
 }
 
 function shellQuote(value: string): string {

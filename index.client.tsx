@@ -4,10 +4,22 @@ import type { PluginCleanup } from "@getpaseo/plugin";
 import type { InlineActionsClient } from "./client/sdk-compat";
 import { CodeBlockActions } from "./client/code-block-actions";
 import { SettingsScreen } from "./client/settings-screen";
+import { RunReport, runReportSchema, transformRunReport } from "./client/run-report";
 import { RUNNABLE_LANGUAGES } from "./shared/code-blocks";
 import { terminalOutputSource } from "./shared/contracts";
 
 export default function contribute(client: InlineActionsClient): PluginCleanup {
+  client.addTimelineTransformer({
+    id: "terminal-run-report",
+    query: { itemType: "user_message" },
+    transform: transformRunReport,
+  });
+  client.addTimelineRenderer({
+    kind: "terminal-run-report",
+    version: 1,
+    schema: runReportSchema,
+    Component: RunReport,
+  });
   if (typeof client.addCodeBlockActions === "function") {
     client.addCodeBlockActions({
       id: "run",
