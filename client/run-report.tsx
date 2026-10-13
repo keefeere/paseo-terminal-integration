@@ -4,6 +4,13 @@ import {
   type PluginTimelineTransformerContribution,
 } from "@getpaseo/plugin/client";
 import { Icon } from "@getpaseo/plugin/client/react-native";
+import {
+  darkHighlightColors,
+  highlightCode,
+  lightHighlightColors,
+  type HighlightStyle,
+  type HighlightToken,
+} from "@getpaseo/highlight";
 import { useMemo, useState } from "react";
 import { Platform, Pressable, ScrollView, Text, View } from "react-native";
 import {
@@ -42,7 +49,12 @@ export function RunReport({ item, theme, layout }: PluginTimelineItemProps<RunRe
     return (
       <View style={styles.card}>
         <Text style={styles.intro}>{item.data.intro}</Text>
-        <CodeBlock text={item.data.code} styles={styles} />
+        <CodeBlock
+          text={item.data.code}
+          language={item.data.language}
+          styles={styles}
+          theme={theme}
+        />
         <Text style={styles.outputLabel}>{item.data.outputLabel}</Text>
       </View>
     );
@@ -71,7 +83,12 @@ export function RunReport({ item, theme, layout }: PluginTimelineItemProps<RunRe
       </Pressable>
       {expanded ? (
         <>
-          <CodeBlock text={item.data.code} styles={styles} />
+          <CodeBlock
+            text={item.data.code}
+            language={item.data.language}
+            styles={styles}
+            theme={theme}
+          />
           <Text style={styles.outputLabel}>{item.data.outputLabel}</Text>
           <CodeBlock text={item.data.output} styles={styles} />
         </>
@@ -82,14 +99,86 @@ export function RunReport({ item, theme, layout }: PluginTimelineItemProps<RunRe
 
 type Styles = ReturnType<typeof createStyles>;
 
-function CodeBlock({ text, styles }: { text: string; styles: Styles }) {
+const MAX_HIGHLIGHT_CHARS = 100_000;
+
+const LANGUAGE_EXTENSIONS: Readonly<Record<string, string>> = {
+  bash: "sh",
+  shell: "sh",
+  console: "sh",
+  zsh: "sh",
+  fish: "sh",
+  python: "py",
+  py: "py",
+  javascript: "js",
+  node: "js",
+  typescript: "ts",
+};
+
+function CodeBlock({
+  text,
+  language,
+  styles,
+  theme,
+}: {
+  text: string;
+  language?: string;
+  styles: Styles;
+  theme?: Theme;
+}) {
+  const highlighted = useMemo(() => highlight(text, language), [language, text]);
+  const colors =
+    theme && isDark(theme.colors.surface0) ? darkHighlightColors : lightHighlightColors;
+
   return (
     <ScrollView horizontal style={styles.codeBlock} contentContainerStyle={styles.codeContent}>
       <Text selectable style={styles.code}>
-        {text}
+        {highlighted
+          ? highlighted.map((line, lineIndex) => (
+              <Text key={lineIndex}>
+                {line.map((token, tokenIndex) => (
+                  <Text
+                    key={`${lineIndex}-${tokenIndex}`}
+                    style={{ color: tokenColor(token, colors, theme?.colors.foreground) }}
+                  >
+                    {token.text}
+                  </Text>
+                ))}
+                {lineIndex < highlighted.length - 1 ? "\n" : null}
+              </Text>
+            ))
+          : text}
       </Text>
     </ScrollView>
   );
+}
+
+function highlight(text: string, language?: string): HighlightToken[][] | null {
+  if (!language || text.length > MAX_HIGHLIGHT_CHARS) return null;
+  const normalized = language.toLowerCase();
+  const extension = LANGUAGE_EXTENSIONS[normalized] ?? normalized;
+  try {
+    return highlightCode(text, `command.${extension}`);
+  } catch {
+    return null;
+  }
+}
+
+function tokenColor(
+  token: HighlightToken,
+  colors: Readonly<Record<HighlightStyle, string>>,
+  fallback = "inherit",
+): string {
+  return token.style ? colors[token.style] : fallback;
+}
+
+function isDark(color: string): boolean {
+  const match = /^#([0-9a-f]{6})$/i.exec(color);
+  if (!match) return true;
+  const value = Number.parseInt(match[1], 16);
+  const red = value >> 16;
+  const green = (value >> 8) & 0xff;
+  const blue = value & 0xff;
+  return red * 0.299 + green * 0.587 + blue * 0.114 < 128;
 }
 
 function createStyles(theme: Theme, compact: boolean) {
