@@ -185,6 +185,7 @@ function RunStatus({ run, styles, theme }: { run: RunSnapshot; styles: Styles; t
     parts.push(
       `${run.mode === "background" ? "Running in background" : "Running"} · ${elapsed(run)}`,
     );
+    tone = styles.success;
   }
   if (run.status === "done") {
     parts.push(`${run.exitCode === 0 ? "✓" : "✗"} exit ${run.exitCode}`);

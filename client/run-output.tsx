@@ -2,7 +2,7 @@ import { useRpc } from "@getpaseo/plugin/client";
 import { Icon } from "@getpaseo/plugin/client/react-native";
 import { useQuery } from "@tanstack/react-query";
 import { useEffect, useMemo, useState } from "react";
-import { Platform, Pressable, ScrollView, Text, View } from "react-native";
+import { ActivityIndicator, Platform, Pressable, ScrollView, Text, View } from "react-native";
 import { runOutput, type RunSnapshot } from "../shared/contracts";
 
 const AUTO_EXPAND_LINES = 5;
@@ -17,6 +17,7 @@ interface OutputTheme {
   colors: {
     border: string;
     foregroundMuted: string;
+    statusSuccess: string;
     surface0: string;
   };
 }
@@ -58,8 +59,11 @@ export function RunOutput({
         onPress={() => setOverride(!expanded)}
         style={({ pressed }) => [styles.toggle, pressed && styles.pressed]}
       >
-        <Icon name={expanded ? "ChevronDown" : "ChevronRight"} size={15} color={summaryColor} />
+        {run.status === "running" ? (
+          <ActivityIndicator size="small" color={theme.colors.statusSuccess} />
+        ) : null}
         <Text style={[styles.summary, { color: summaryColor }]}>{summary}</Text>
+        <Icon name={expanded ? "ChevronDown" : "ChevronRight"} size={15} color={summaryColor} />
       </Pressable>
       {expanded ? (
         <View style={styles.output}>
@@ -90,7 +94,7 @@ function createStyles(theme: OutputTheme) {
     container: { gap: 6 },
     toggle: { flexDirection: "row" as const, alignItems: "center" as const, gap: 4 },
     pressed: { opacity: 0.7 },
-    summary: { flexShrink: 1 },
+    summary: { flex: 1 },
     output: {
       borderRadius: 6,
       backgroundColor: theme.colors.surface0,
