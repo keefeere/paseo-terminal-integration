@@ -3,7 +3,6 @@ import {
   ExternalLink,
   SettingsAction,
   SettingsCard,
-  SettingsInput,
   SettingsRow,
   SettingsSection,
   SettingsSelect,
@@ -40,14 +39,6 @@ function ReadySettingsScreen({
 }) {
   const { values, revision } = settings;
   const [draft, setDraft] = useState(values);
-  const [collapseLinesText, setCollapseLinesText] = useState(
-    String(values.collapseOutputAfterLines),
-  );
-  const collapseLines = /^\d+$/.test(collapseLinesText) ? Number(collapseLinesText) : NaN;
-  const collapseLinesError =
-    Number.isInteger(collapseLines) && collapseLines >= 0 && collapseLines <= 5_000
-      ? null
-      : "Enter a whole number from 0 to 5000.";
   const dirty = useMemo(() => JSON.stringify(draft) !== JSON.stringify(values), [draft, values]);
   const editorStyle = useMemo(
     () => ({
@@ -82,21 +73,6 @@ function ReadySettingsScreen({
             disabled={settings.saving}
             error={settings.saveError}
             onValueChange={(sendToAgent) => setDraft((current) => ({ ...current, sendToAgent }))}
-          />
-          <SettingsInput
-            label="Collapse output after this many lines"
-            hint="Long output sent back to the agent starts collapsed. Set 0 to keep all output expanded."
-            initialValue={collapseLinesText}
-            placeholder="20"
-            disabled={settings.saving}
-            error={collapseLinesError}
-            onChangeText={(text) => {
-              setCollapseLinesText(text);
-              const value = /^\d+$/.test(text) ? Number(text) : NaN;
-              if (Number.isInteger(value) && value >= 0 && value <= 5_000) {
-                setDraft((current) => ({ ...current, collapseOutputAfterLines: value }));
-              }
-            }}
           />
           <SettingsRow
             label="Where the terminal appears"
@@ -212,10 +188,10 @@ function ReadySettingsScreen({
         <SettingsCard>
           <SettingsAction
             label="Apply changes"
-            hint="Output display changes immediately. Command instructions apply only to newly created agents."
+            hint="Command instructions apply only to newly created agents."
             error={settings.saveError}
             actionLabel={settings.saving ? "Saving…" : "Save changes"}
-            disabled={settings.saving || !dirty || collapseLinesError !== null}
+            disabled={settings.saving || !dirty}
             onPress={() => void settings.save(draft, revision)}
           />
         </SettingsCard>

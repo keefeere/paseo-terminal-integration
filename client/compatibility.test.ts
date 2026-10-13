@@ -47,6 +47,23 @@ describe("old and new Paseo clients", () => {
     expect(methods.addTimelineTransformer).toHaveBeenCalledWith(
       expect.objectContaining({ id: "terminal-run-report" }),
     );
+    const reportTransformer = methods.addTimelineTransformer.mock.calls[0][0].transform;
+    expect(
+      reportTransformer({
+        item: {
+          type: "user_message",
+          text: "[paseo-terminal-integration-report]: # (v1)\n\nfull report",
+        },
+      }),
+    ).toEqual({ items: [] });
+    expect(
+      reportTransformer({ item: { type: "user_message", text: "ordinary user message" } }),
+    ).toBeUndefined();
+    expect(
+      methods.addTimelineRenderer.mock.calls
+        .map(([renderer]) => renderer.kind)
+        .includes("terminal-run-report"),
+    ).toBe(false);
   });
   it("retains cards, /run, /blocks and activates scans on old clients", async () => {
     const { methods, context } = client(false);
