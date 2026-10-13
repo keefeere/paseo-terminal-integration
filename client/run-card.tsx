@@ -15,6 +15,7 @@ import {
   type RunSnapshot,
 } from "../shared/contracts";
 import { preferences } from "../shared/settings";
+import { RunOutput } from "./run-output";
 
 type Theme = PluginTimelineItemProps["theme"];
 type Styles = ReturnType<typeof createStyles>;
@@ -175,7 +176,7 @@ export function RunCard({ item, agentId, theme, layout }: PluginTimelineItemProp
                 }
               />
             </View>
-            {run ? <RunStatus run={run} styles={styles} /> : null}
+            {run ? <RunStatus run={run} styles={styles} theme={theme} /> : null}
           </View>
         );
       })}
@@ -183,7 +184,7 @@ export function RunCard({ item, agentId, theme, layout }: PluginTimelineItemProp
   );
 }
 
-function RunStatus({ run, styles }: { run: RunSnapshot; styles: Styles }) {
+function RunStatus({ run, styles, theme }: { run: RunSnapshot; styles: Styles; theme: Theme }) {
   const parts: string[] = [];
   let tone: TextStyle = styles.muted;
   if (run.status === "queued") parts.push("Queued, waiting for the terminal");
@@ -209,17 +210,15 @@ function RunStatus({ run, styles }: { run: RunSnapshot; styles: Styles }) {
 
   return (
     <View style={styles.status}>
-      {parts.length > 0 ? <Text style={tone}>{parts.join(" · ")}</Text> : null}
-      {run.error ? <Text style={styles.danger}>{run.error}</Text> : null}
-      {run.tail.length > 0 ? (
-        <View style={styles.tail}>
-          {run.tail.map((line, index) => (
-            <Text key={index} style={styles.tailLine} numberOfLines={1}>
-              {line || " "}
-            </Text>
-          ))}
-        </View>
+      {parts.length > 0 ? (
+        <RunOutput
+          run={run}
+          summary={parts.join(" · ")}
+          summaryColor={tone.color as string}
+          theme={theme}
+        />
       ) : null}
+      {run.error ? <Text style={styles.danger}>{run.error}</Text> : null}
     </View>
   );
 }
@@ -362,13 +361,5 @@ function createStyles(theme: Theme, compact: boolean) {
     primaryButton: { backgroundColor: theme.colors.accent, borderColor: theme.colors.accent },
     buttonText: { fontSize: 13 },
     status: { gap: 6 },
-    tail: {
-      padding: 8,
-      borderRadius: 6,
-      backgroundColor: theme.colors.surface0,
-      borderWidth: 1,
-      borderColor: theme.colors.border,
-    },
-    tailLine: { color: theme.colors.foregroundMuted, fontFamily: MONOSPACE, fontSize: 12 },
   };
 }

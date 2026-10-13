@@ -9,6 +9,7 @@ import {
   cancelRun,
   runAdhoc,
   runKey,
+  runOutput,
   runStatus,
   scanBlocks,
   searchTerminalOutput,
@@ -48,6 +49,7 @@ export default function contribute(server: PluginServerContext) {
 
   server.handle(startRun, (input, { paseo }) => runnerFor(paseo).start(input));
   server.handle(runStatus, ({ keys }, { paseo }) => ({ runs: runnerFor(paseo).status(keys) }));
+  server.handle(runOutput, ({ key }, { paseo }) => runnerFor(paseo).output(key));
   server.handle(cancelRun, ({ key }, { paseo }) => runnerFor(paseo).cancel(key));
   server.handle(sendRunOutput, ({ key }, { paseo }) => runnerFor(paseo).sendOutput(key));
 

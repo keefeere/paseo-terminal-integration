@@ -29,6 +29,8 @@ const FINISHED_RUN_LIMIT = 200;
 const BACKGROUND_MAX_LINES = 5_000;
 const BACKGROUND_MAX_LINE_CHARS = 16_000;
 const BACKGROUND_FLUSH_MS = 1_000;
+const UI_OUTPUT_MAX_LINES = 5_000;
+const UI_OUTPUT_MAX_CHARS = 1_000_000;
 
 // sendKeys() expands only a few key names, so control characters are written as raw bytes.
 const CTRL_C = "\x03";
@@ -144,6 +146,17 @@ export class TerminalRunner {
       const run = this.runs.get(key);
       return run ? [snapshot(run)] : [];
     });
+  }
+
+  output(key: string): { lines: string[]; lineCount: number; truncated: boolean } | null {
+    const run = this.runs.get(key);
+    if (!run) return null;
+    const lines = boundedOutput(run.output, UI_OUTPUT_MAX_LINES, UI_OUTPUT_MAX_CHARS);
+    return {
+      lines,
+      lineCount: run.output.length,
+      truncated: run.truncated || lines.length < run.output.length,
+    };
   }
 
   cancel(key: string): RunSnapshot | null {
@@ -373,6 +386,23 @@ export class TerminalRunner {
       this.runs.delete(run.key);
     }
   }
+}
+
+export function boundedOutput(
+  output: readonly string[],
+  maxLines: number,
+  maxChars: number,
+): string[] {
+  const selected: string[] = [];
+  let characters = 0;
+  for (let index = output.length - 1; index >= 0 && selected.length < maxLines; index--) {
+    const line = output[index];
+    const remaining = maxChars - characters;
+    if (remaining <= 0) break;
+    selected.push(line.length <= remaining ? line : line.slice(-remaining));
+    characters += Math.min(line.length, remaining) + 1;
+  }
+  return selected.reverse();
 }
 
 /** Read through a call: TypeScript keeps `run.status` narrowed across the awaits in execute(). */

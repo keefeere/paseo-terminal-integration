@@ -20,6 +20,8 @@ the reply finishes. On other Paseo versions a **Run in terminal** card appears u
 - Sent output remains available to the agent but is hidden from the visible timeline, since the
   inline run controls and terminal already show the command status and recent output.
 - **Stop** sends Ctrl-C; **Send output so far** reports a still-running command.
+- Output up to 5 lines opens automatically. Longer output stays behind the status row; expand it
+  to browse the retained history in a scrollable panel, even after its terminal tab is closed.
 
 **Terminal beside the chat.** On Paseo builds with the terminal open-location setting, choose
 **Settings → Layout → Open location → Opening a terminal → On the side** and "Agent commands"
@@ -80,7 +82,7 @@ The commands are available on Paseo versions without inline code block actions.
 - Terminal output is read from the screen, so very long lines arrive wrapped and only the last
   3,000 rows are visible. The agent receives at most 300 lines or 24,000 characters.
 - Run state lives in the plugin process; reloading the plugin forgets it. Controls and cards stay,
-  and nothing is re-run.
+  but their saved output is no longer available and nothing is re-run.
 - A command that has not started within 20 seconds fails, for example when something else is
   running in "Agent commands".
 

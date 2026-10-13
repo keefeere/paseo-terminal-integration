@@ -16,6 +16,10 @@ status, recent output, and terminal. Optional command guidance can be added to n
 for either a local-daemon or client-server setup. Both supplied instruction templates are editable
 per host.
 
+Output up to five lines opens automatically in the inline run controls. Longer output can be
+expanded into a scrollable history panel after the run, including after its terminal tab is closed.
+The retained history lasts until the plugin process is reloaded or prunes an older run.
+
 The plugin requires Paseo 0.10.1 or later and a macOS or Linux daemon host with `bash`. Python and
 Node.js code blocks also require their corresponding interpreter. Plugins are trusted code; this
 plugin starts processes and types commands into terminals on the daemon host.

@@ -68,6 +68,18 @@ export const runStatus = defineRpc({
   output: z.object({ runs: z.array(runSnapshotSchema) }),
 });
 
+export const runOutput = defineRpc({
+  name: "run.output",
+  input: z.object({ key: z.string() }),
+  output: z
+    .object({
+      lines: z.array(z.string()),
+      lineCount: z.number().int().nonnegative(),
+      truncated: z.boolean(),
+    })
+    .nullable(),
+});
+
 export const cancelRun = defineRpc({
   name: "run.cancel",
   input: z.object({ key: z.string() }),
