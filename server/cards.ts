@@ -58,6 +58,11 @@ export async function appendCardForTurn(
   event: PluginLifecycleEvents["agent.turn_ended"],
 ): Promise<void> {
   if (event.outcome.kind !== "completed") return;
+  // Paseo 0.15 always emits this event with an empty timeline, so read the reply back.
+  if (event.timeline.length === 0) {
+    await scanLatestReply(paseo, event.agent.id);
+    return;
+  }
   const blocks = runnableBlocks(latestAssistantText(event.timeline));
   if (blocks.length > 0) await appendRunCard(paseo, event.agent.id, blocks);
 }
