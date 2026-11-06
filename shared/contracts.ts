@@ -19,6 +19,12 @@ export const RUN_CARD_VERSION = 1;
 export const runCardSchema = z.object({
   cardId: z.string(),
   blocks: z.array(z.object({ lang: z.string(), code: z.string() })),
+  /**
+   * `command` cards come from /run and show on every client. `reply` cards add run buttons to an
+   * agent reply for clients without inline code-block actions; inline clients hide them.
+   * Absent on cards written before this field existed.
+   */
+  origin: z.enum(["command", "reply"]).optional(),
 });
 export type RunCardData = z.output<typeof runCardSchema>;
 

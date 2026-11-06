@@ -32,17 +32,18 @@ export async function appendRunCard(
   paseo: Paseo,
   agentId: string,
   blocks: CodeBlock[],
+  origin: NonNullable<RunCardData["origin"]>,
 ): Promise<string | null> {
   const fitting: CodeBlock[] = [];
   for (const block of blocks) {
-    const data: RunCardData = { cardId: "", blocks: [...fitting, block] };
+    const data: RunCardData = { cardId: "", blocks: [...fitting, block], origin };
     if (JSON.stringify(data).length > MAX_CARD_BYTES) break;
     fitting.push(block);
   }
   if (fitting.length === 0) return null;
 
   const cardId = randomUUID();
-  const data: RunCardData = { cardId, blocks: fitting };
+  const data: RunCardData = { cardId, blocks: fitting, origin };
   await paseo.agents.ref(agentId).timeline.append({
     type: "plugin",
     id: cardId,
@@ -59,7 +60,7 @@ export async function appendCardForTurn(
 ): Promise<void> {
   if (event.outcome.kind !== "completed") return;
   const blocks = runnableBlocks(latestAssistantText(event.timeline));
-  if (blocks.length > 0) await appendRunCard(paseo, event.agent.id, blocks);
+  if (blocks.length > 0) await appendRunCard(paseo, event.agent.id, blocks, "reply");
 }
 
 /** Re-scans the latest reply, for conversations that predate the plugin. */
@@ -70,6 +71,6 @@ export async function scanLatestReply(paseo: Paseo, agentId: string): Promise<nu
   if (page.error) throw new Error(page.error);
   const blocks = runnableBlocks(latestAssistantText(page.entries.map((entry) => entry.item)));
   if (blocks.length === 0) return 0;
-  await appendRunCard(paseo, agentId, blocks);
+  await appendRunCard(paseo, agentId, blocks, "reply");
   return blocks.length;
 }

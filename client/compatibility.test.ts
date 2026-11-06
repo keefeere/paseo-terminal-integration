@@ -43,7 +43,12 @@ describe("old and new Paseo clients", () => {
     const legacyRenderer = methods.addTimelineRenderer.mock.calls
       .map(([renderer]) => renderer)
       .find((renderer) => renderer.kind === "terminal-run-card");
-    expect(legacyRenderer?.Component()).toBeNull();
+    // Agent replies already have inline buttons; only /run cards render on new clients.
+    const render = (origin?: "command" | "reply") =>
+      legacyRenderer?.Component({ item: { data: { cardId: "c", blocks: [], origin } } });
+    expect(render("reply")).toBeNull();
+    expect(render(undefined)).toBeNull();
+    expect(render("command")).not.toBeNull();
     expect(methods.addTimelineTransformer).toHaveBeenCalledWith(
       expect.objectContaining({ id: "terminal-run-report" }),
     );

@@ -8,7 +8,7 @@ vi.mock("./cards", () => ({
 import { appendCardForTurn } from "./cards";
 import contribute from "../index.server";
 import { CLIENT_SERVER_INSTRUCTIONS, INSTRUCTION_PROMPT_MARKER } from "../shared/instructions";
-it("does not scan modern-only conversations; legacy opt-in enables the old hook", async () => {
+it("writes reply cards for every turn, with or without the legacy opt-in", async () => {
   const handlers = new Map<string, (...args: unknown[]) => unknown>();
   let beforeAgentCreate: (...args: unknown[]) => unknown = () => {
     throw new Error("before hook missing");
@@ -44,10 +44,10 @@ it("does not scan modern-only conversations; legacy opt-in enables the old hook"
   } as unknown as PluginServerContext;
   contribute(server);
   await turnEnded({}, { paseo: {} });
-  expect(appendCardForTurn).not.toHaveBeenCalled();
-  await handlers.get("legacy.cards.enable")!();
-  await turnEnded({}, { paseo: {} });
   expect(appendCardForTurn).toHaveBeenCalledTimes(1);
+  expect(await handlers.get("legacy.cards.enable")!()).toEqual({ enabled: true });
+  await turnEnded({}, { paseo: {} });
+  expect(appendCardForTurn).toHaveBeenCalledTimes(2);
 
   const request = await beforeAgentCreate({ request: { config: { systemPrompt: "Base" } } });
   expect(request).toMatchObject({

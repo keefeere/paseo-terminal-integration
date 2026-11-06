@@ -37,15 +37,12 @@ export default function contribute(server: PluginServerContext) {
     };
   });
 
-  // COMPAT(legacyRunCards): only old clients opt into scanning; remove after 2027-04-01.
-  let legacyCardsRequested = false;
-  server.handle(enableLegacyCards, async () => {
-    legacyCardsRequested = true;
-    return { enabled: true };
-  });
-  server.on("agent.turn_ended", (event, { paseo }) => {
-    if (legacyCardsRequested) return appendCardForTurn(paseo, event);
-  });
+  // Reply cards are written for every turn: an in-memory opt-in from old clients was lost on each
+  // daemon restart, so phones on the App Store client stopped getting run buttons. Inline-action
+  // clients hide reply cards. COMPAT(legacyRunCards): old clients still call this; remove after
+  // 2027-04-01.
+  server.handle(enableLegacyCards, async () => ({ enabled: true }));
+  server.on("agent.turn_ended", (event, { paseo }) => appendCardForTurn(paseo, event));
 
   server.handle(startRun, (input, { paseo }) => runnerFor(paseo).start(input));
   server.handle(runStatus, ({ keys }, { paseo }) => ({ runs: runnerFor(paseo).status(keys) }));
@@ -55,7 +52,7 @@ export default function contribute(server: PluginServerContext) {
 
   server.handle(runAdhoc, async ({ agentId, command }, { paseo }) => {
     const block = { lang: "bash", code: command };
-    const cardId = await appendRunCard(paseo, agentId, [block]);
+    const cardId = await appendRunCard(paseo, agentId, [block], "command");
     if (!cardId) throw new Error("Command is too long");
     await runnerFor(paseo).start({
       agentId,
