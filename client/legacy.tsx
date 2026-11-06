@@ -10,6 +10,19 @@ import {
   scanBlocks,
 } from "../shared/contracts";
 
+export function registerRunCommand(client: PluginClientContext): void {
+  client.addSlashCommand({
+    name: "run",
+    description: "Run a shell command in the workspace terminal and send its output to the agent",
+    argumentHint: "<command>",
+    context: "agent",
+    async onSubmit({ args, agent, rpc }) {
+      if (!args) throw new Error("Usage: /run <command>");
+      await rpc(runAdhoc, { agentId: agent.id, command: args });
+    },
+  });
+}
+
 // A function declaration: the host reads the default export before the module body has run.
 export function contributeLegacy(client: PluginClientContext): PluginCleanup {
   // COMPAT(legacyRunCards): added in the inline-actions fork, remove after 2027-04-01.
@@ -21,17 +34,6 @@ export function contributeLegacy(client: PluginClientContext): PluginCleanup {
     version: RUN_CARD_VERSION,
     schema: runCardSchema,
     Component: RunCard,
-  });
-
-  client.addSlashCommand({
-    name: "run",
-    description: "Run a shell command in the workspace terminal and send its output to the agent",
-    argumentHint: "<command>",
-    context: "agent",
-    async onSubmit({ args, agent, rpc }) {
-      if (!args) throw new Error("Usage: /run <command>");
-      await rpc(runAdhoc, { agentId: agent.id, command: args });
-    },
   });
 
   async function addRunButtons(agentId: string, rpc: PluginClientContext["rpc"]) {

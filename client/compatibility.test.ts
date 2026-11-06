@@ -39,7 +39,7 @@ describe("old and new Paseo clients", () => {
     expect(typeof contribute(context)).toBe("function");
     expect(methods.addCodeBlockActions).toHaveBeenCalledTimes(1);
     expect(methods.rpc).not.toHaveBeenCalled();
-    expect(methods.addSlashCommand).not.toHaveBeenCalled();
+    expect(methods.addSlashCommand.mock.calls.map(([command]) => command.name)).toEqual(["run"]);
     const legacyRenderer = methods.addTimelineRenderer.mock.calls
       .map(([renderer]) => renderer)
       .find((renderer) => renderer.kind === "terminal-run-card");
@@ -69,6 +69,22 @@ describe("old and new Paseo clients", () => {
         .map(([renderer]) => renderer.kind)
         .includes("terminal-run-report"),
     ).toBe(false);
+  });
+  it.each([true, false])("runs /run through the server on client modern=%s", async (modern) => {
+    const { methods, context } = client(modern);
+    contribute(context);
+    const command = methods.addSlashCommand.mock.calls
+      .map(([entry]) => entry)
+      .find((entry) => entry.name === "run");
+    const rpc = vi.fn().mockResolvedValue({ cardId: "card" });
+    await command.onSubmit({ args: "echo test", agent: { id: "agent-1" }, rpc });
+    expect(rpc).toHaveBeenCalledWith(expect.objectContaining({ name: "run.adhoc" }), {
+      agentId: "agent-1",
+      command: "echo test",
+    });
+    await expect(command.onSubmit({ args: "", agent: { id: "agent-1" }, rpc })).rejects.toThrow(
+      "Usage: /run <command>",
+    );
   });
   it("retains cards, /run, /blocks and activates scans on old clients", async () => {
     const { methods, context } = client(false);

@@ -1,4 +1,6 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
+import type { PluginHandlerContext, PluginLifecycleEvents } from "@getpaseo/plugin/server";
+import { appendCardForTurn } from "../server/cards";
 import { runnableBlock, runnableBlocks } from "./code-blocks";
 import { inlineRunKey } from "./contracts";
 describe("parsed executable blocks", () => {
@@ -21,6 +23,39 @@ describe("parsed executable blocks", () => {
     expect(runnableBlocks("```bash\necho old\n```\n\n```json\n{}\n```")).toEqual([
       { lang: "bash", code: "echo old" },
     ]);
+  });
+  it("fetches the latest reply when a completed turn has an empty event timeline", async () => {
+    const append = vi.fn().mockResolvedValue(undefined);
+    const refetch = vi.fn().mockResolvedValue({
+      entries: [{ item: { type: "assistant_message", text: "```bash\necho test\n```" } }],
+    });
+    const paseo = {
+      agents: { ref: () => ({ timeline: { refetch, append } }) },
+    } as unknown as PluginHandlerContext["paseo"];
+    const event = {
+      agent: {
+        id: "agent-1",
+        workspaceId: null,
+        parentAgentId: null,
+        provider: "pi",
+        cwd: "/tmp",
+        title: null,
+      },
+      turnId: null,
+      outcome: { kind: "completed" },
+      timeline: [],
+    } satisfies PluginLifecycleEvents["agent.turn_ended"];
+    await appendCardForTurn(paseo, event);
+    expect(refetch).toHaveBeenCalledOnce();
+    expect(append).toHaveBeenCalledWith(
+      expect.objectContaining({
+        kind: "terminal-run-card",
+        data: expect.objectContaining({
+          origin: "reply",
+          blocks: [{ lang: "bash", code: "echo test" }],
+        }),
+      }),
+    );
   });
   it("scopes stable keys to host, agent, message, and the absolute fence index", () => {
     const first = inlineRunKey("h", "a", "m", 1);

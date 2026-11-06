@@ -59,6 +59,11 @@ export async function appendCardForTurn(
   event: PluginLifecycleEvents["agent.turn_ended"],
 ): Promise<void> {
   if (event.outcome.kind !== "completed") return;
+  // Some daemon versions send an empty timeline in the turn-ended event.
+  if (event.timeline.length === 0) {
+    await scanLatestReply(paseo, event.agent.id);
+    return;
+  }
   const blocks = runnableBlocks(latestAssistantText(event.timeline));
   if (blocks.length > 0) await appendRunCard(paseo, event.agent.id, blocks, "reply");
 }

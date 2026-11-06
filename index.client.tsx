@@ -1,4 +1,4 @@
-import { contributeLegacy } from "./client/legacy";
+import { contributeLegacy, registerRunCommand } from "./client/legacy";
 import type { PluginCleanup } from "@getpaseo/plugin";
 import type { InlineActionsClient } from "./client/sdk-compat";
 import { CodeBlockActions } from "./client/code-block-actions";
@@ -20,6 +20,7 @@ function CommandRunCard(props: PluginTimelineItemProps<RunCardData>) {
 }
 
 export default function contribute(client: InlineActionsClient): PluginCleanup {
+  registerRunCommand(client);
   client.addTimelineTransformer({
     id: "terminal-run-report",
     query: { itemType: "user_message" },
